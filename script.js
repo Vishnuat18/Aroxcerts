@@ -14,22 +14,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnLoginSubmit = document.getElementById('btnLoginSubmit');
   const loginError = document.getElementById('loginError');
   const profileIcon = document.getElementById('profileIcon');
+  const appContainer = document.getElementById('appContainer');
 
   const checkAuth = () => {
-    if (sessionStorage.getItem('arox_admin_auth') === 'true') {
-      if(loginModal) loginModal.classList.remove('active');
-      if(profileIcon) profileIcon.style.display = 'flex';
-    } else {
-      if(loginModal) loginModal.classList.add('active');
-      if(profileIcon) profileIcon.style.display = 'none';
-    }
+    // Force strict login: Ignore sessionStorage and force popup on reload
+    if(loginModal) loginModal.classList.add('active');
+    if(profileIcon) profileIcon.style.display = 'none';
+    if(appContainer) appContainer.style.display = 'none';
   };
 
   const attemptLogin = () => {
     if (loginPassword.value === 'arox2026') {
-      sessionStorage.setItem('arox_admin_auth', 'true');
+      if(loginModal) loginModal.classList.remove('active');
+      if(profileIcon) profileIcon.style.display = 'flex';
+      if(appContainer) appContainer.style.display = 'flex';
       if(loginError) loginError.textContent = '';
-      checkAuth();
+      
+      // Calculate layout now that it's visible
+      if (typeof updateScale === 'function') setTimeout(updateScale, 50);
     } else {
       if(loginError) loginError.textContent = 'Incorrect password.';
       if(loginPassword) loginPassword.value = '';
@@ -84,8 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputDescription = document.getElementById('inputDescription');
   const viewDescription = document.getElementById('viewDescription');
 
-  const inputLogo = document.getElementById('inputLogo');
-  const certLogo = document.getElementById('certLogo');
+  const inputCertYear = document.getElementById('inputCertYear');
+  const inputCertNum = document.getElementById('inputCertNum');
 
   const btnGenId = document.getElementById('btnGenId');
   const btnDownloadPdf = document.getElementById('btnDownloadPdf');
@@ -152,6 +154,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!inputIssueDate.value) inputIssueDate.value = "";
   if (!inputVerifyUrl.value) inputVerifyUrl.value = "";
 
+  // Handle Certificate ID Multi-part Logic
+  const updateCertId = () => {
+    if (inputCertYear && inputCertNum && inputCertId) {
+      inputCertId.value = `AT/INT/${inputCertYear.value.trim()}/${inputCertNum.value.trim()}`;
+      inputCertId.dispatchEvent(new Event('input'));
+    }
+  };
+  if (inputCertYear) inputCertYear.addEventListener('input', updateCertId);
+  if (inputCertNum) inputCertNum.addEventListener('input', updateCertId);
+
   // Bind individual inputs to their preview segments with placeholders
   syncInput(inputName, viewName, '[Candidate Name]');
   syncInput(inputCourse, viewCourse, '[Internship/Course Title]');
@@ -161,6 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
   syncInput(inputDomain, viewDomain, '[Domain]');
   syncDateInput(inputIssueDate, viewIssueDate, '[Date of Issue]');
   syncInput(inputCertId, viewCertId, '[Certificate ID]');
+  
+  if (inputCertYear && inputCertNum) updateCertId(); // Init
 
   // Handle selects dropdown toggle & sync logic for Course Title
   const handleCourseChange = () => {
@@ -217,18 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const initialUrl = inputVerifyUrl.value.trim();
   viewVerifyUrl.textContent = initialUrl ? (initialUrl.startsWith('http') ? initialUrl : `https://${initialUrl}`) : '[Verification URL]';
 
-  // --- Company Logo Upload Handler ---
-  inputLogo.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        certLogo.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-
   /* ==========================================================================
      FORM VALIDATION PIPELINE
      Checks for missing values and pops up alert dialogue to focus missing inputs
@@ -284,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const advanceCertId = () => {
     const DB_KEY = 'aroxtech_certificates';
     const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-    const year = 2026;
+    const year = inputCertYear ? (inputCertYear.value.trim() || '2026') : '2026';
     let nextNum = 101;
     
     const prefix = `AT/INT/${year}/`;
@@ -299,9 +301,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (highestNum >= 101) nextNum = highestNum + 1;
     }
     
-    const autoId = `${prefix}${String(nextNum).padStart(4, '0')}`;
-    inputCertId.value = autoId;
-    viewCertId.textContent = autoId;
+    const autoNum = String(nextNum).padStart(4, '0');
+    if (inputCertNum) {
+      inputCertNum.value = autoNum;
+      inputCertNum.dispatchEvent(new Event('input')); // trigger updateCertId
+    } else if (inputCertId) {
+      inputCertId.value = `${prefix}${autoNum}`;
+      inputCertId.dispatchEvent(new Event('input'));
+    }
   };
 
   btnGenId.addEventListener('click', advanceCertId);
@@ -619,7 +626,35 @@ document.addEventListener('DOMContentLoaded', () => {
     btnAddDb.addEventListener('click', () => {
       saveToDatabase();
       if (editingDbId === null) advanceCertId();
+      showCertView(); // Optional: Flip back to preview after adding
     });
+  }
+
+  const btnViewDb = document.getElementById('btnViewDb');
+  const btnBackToCert = document.getElementById('btnBackToCert');
+  const certPreviewView = document.getElementById('certPreviewView');
+  const dbListView = document.getElementById('dbListView');
+
+  const showDbView = () => {
+    if(certPreviewView) certPreviewView.style.display = 'none';
+    if(dbListView) dbListView.style.display = 'block';
+  };
+
+  const showCertView = () => {
+    if(dbListView) dbListView.style.display = 'none';
+    if(certPreviewView) certPreviewView.style.display = 'flex';
+    if (typeof updateScale === 'function') setTimeout(updateScale, 50);
+  };
+
+  if(btnViewDb) {
+    btnViewDb.addEventListener('click', () => {
+      renderDatabase();
+      showDbView();
+    });
+  }
+
+  if(btnBackToCert) {
+    btnBackToCert.addEventListener('click', showCertView);
   }
 
   const dbTableBody = document.getElementById('dbTableBody');
@@ -636,6 +671,14 @@ document.addEventListener('DOMContentLoaded', () => {
     inputEndDate.value = rec.end_date;
     inputDuration.value = rec.total_days;
     inputCertId.value = rec.cert_id;
+    
+    if (inputCertYear && inputCertNum && rec.cert_id) {
+      const parts = rec.cert_id.split('/');
+      if (parts.length >= 4) {
+        inputCertYear.value = parts[2];
+        inputCertNum.value = parts[3];
+      }
+    }
     
     // course dropdown
     const optionExists = Array.from(selectCourse.options).some(opt => opt.value === rec.internship_details);

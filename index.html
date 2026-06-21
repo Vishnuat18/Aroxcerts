@@ -37,6 +37,11 @@
   </div>
 
   <!-- ==========================================================================
+       MAIN APP CONTAINER (Hidden on load)
+       ========================================================================== -->
+  <div id="appContainer" style="display: none; flex: 1; width: 100%; height: 100vh; flex-direction: row;">
+
+  <!-- ==========================================================================
        SIDEBAR: Certificate Editor Form Panel
        ========================================================================== -->
   <aside class="editor-panel" id="editorPanel">
@@ -55,12 +60,6 @@
     </div>
 
     <div class="editor-content">
-      <!-- Company Logo Upload -->
-      <div class="form-group">
-        <label for="inputLogo">Upload Company Logo</label>
-        <input type="file" id="inputLogo" accept=".png, .jpg, .jpeg, .svg">
-      </div>
-
       <!-- Candidate Name -->
       <div class="form-group">
         <label for="inputName">Candidate Name</label>
@@ -130,26 +129,30 @@
 
       <!-- Certificate ID (Auto-generatable) -->
       <div class="form-group">
-        <label for="inputCertId">Certificate ID</label>
-        <div class="input-with-action">
-          <input type="text" id="inputCertId" placeholder="[Certificate ID]">
+        <label>Certificate ID</label>
+        <div class="input-with-action" style="display: flex; gap: 5px; align-items: center;">
+          <span style="font-weight: 700; color: #4A5568; font-size: 14px;">AT/INT/</span>
+          <input type="text" id="inputCertYear" placeholder="2026" value="2026" style="width: 70px; text-align: center; padding: 10px 5px;">
+          <span style="font-weight: 700; color: #4A5568; font-size: 14px;">/</span>
+          <input type="text" id="inputCertNum" placeholder="0101" style="flex: 1; text-align: center; padding: 10px 5px;">
           <button type="button" id="btnGenId">Auto Gen</button>
         </div>
         <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: AT/INT/2026/0101</small>
+        <input type="hidden" id="inputCertId">
       </div>
 
       <!-- Verification URL -->
       <div class="form-group">
         <label for="inputVerifyUrl">Verification URL</label>
-        <input type="text" id="inputVerifyUrl" placeholder="[Verification URL]">
-        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: aroxtech.in/verify</small>
+        <input type="text" id="inputVerifyUrl" placeholder="[Verification URL]" value="aroxtech.in/verify" readonly style="background-color: #f1f5f9; cursor: not-allowed; color: #64748b;">
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Fixed URL</small>
       </div>
 
       <!-- Appreciation Paragraph -->
       <div class="form-group">
         <label for="inputDescription">Appreciation Text</label>
-        <textarea id="inputDescription" rows="3" placeholder="[Appreciation Text]"></textarea>
-        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: During this internship, he/she was found to be dedicated...</small>
+        <textarea id="inputDescription" rows="3" placeholder="[Appreciation Text]" readonly style="background-color: #f1f5f9; cursor: not-allowed; color: #64748b;">During this internship, he/she was found to be dedicated, enthusiastic and hardworking. We wish him/her all the best for future endeavors.</textarea>
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Fixed Text</small>
       </div>
     </div>
 
@@ -162,8 +165,18 @@
       <button class="btn-secondary" id="btnCancelEdit" style="margin-top: 10px; width: 100%; display: none; color: var(--accent-orange); border-color: rgba(242, 101, 34, 0.3);">
         Cancel Edit
       </button>
+      <button class="btn-secondary" id="btnViewDb" style="margin-top: 10px; width: 100%;">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        View Database
+      </button>
     </div>
   </aside>
+
+  <!-- Dynamic Right Panel Container -->
+  <div class="dynamic-right-panel" style="flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column;">
+    
+    <!-- View A: Certificate Preview -->
+    <div id="certPreviewView" style="display: flex; flex-direction: column; width: 100%; height: 100%;">
 
   <!-- ==========================================================================
        RIGHT PANEL: Live Certificate Preview Canvas
@@ -539,29 +552,13 @@
         </div> <!-- /export-wrapper -->
       </div> <!-- /cert-scale-wrapper -->
     </div> <!-- /preview-scroller -->
-  </main>
-
-  <!-- ==========================================================================
-       RIGHT PANEL: Database & Export Actions
-       ========================================================================== -->
-  <aside class="database-panel" id="databasePanel">
-    <div class="db-panel-header">
-      <h2>Generated Certificates</h2>
-      <p>Click a record to edit or delete</p>
-    </div>
     
-    <div class="db-panel-body">
-      <div class="db-list" id="dbTableBody">
-        <!-- DB Items will be populated here -->
-      </div>
-    </div>
-    
-    <div class="db-panel-footer">
+    <div class="cert-export-footer" style="padding: 20px; background: #fff; border-top: 1px solid #E2E8F0;">
       <button class="btn-primary" id="btnDownloadPdf" style="margin-bottom: 10px; width: 100%;">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-        Download PDF
+        Download PDF (A4 HQ)
       </button>
-      <div class="btn-secondary-row" style="margin-bottom: 10px;">
+      <div class="btn-secondary-row">
         <button class="btn-secondary" id="btnDownloadPng" style="flex: 1;">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           Save PNG
@@ -571,12 +568,37 @@
           Print
         </button>
       </div>
+    </div>
+  </div> <!-- /certPreviewView -->
+
+  <!-- View B: Database Panel -->
+  <aside class="database-panel" id="dbListView" style="display: none; width: 100%; height: 100%; max-width: none;">
+    <div class="db-panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h2>Generated Certificates</h2>
+        <p>Click a record to edit or delete</p>
+      </div>
+      <button class="btn-secondary" id="btnBackToCert" style="padding: 8px 15px; font-size: 12px;">
+        &larr; Back to Certificate
+      </button>
+    </div>
+    
+    <div class="db-panel-body">
+      <div class="db-list" id="dbTableBody" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; align-items: start; align-content: start;">
+        <!-- DB Items will be populated here -->
+      </div>
+    </div>
+    
+    <div class="db-panel-footer">
       <div class="btn-secondary-row">
         <button class="btn-secondary" id="btnExportCsv" style="flex: 1;">Export CSV</button>
         <button class="btn-secondary" id="btnClearDb" style="flex: 1; color: #ff4d4d; border-color: rgba(255,77,77,0.3);">Clear All</button>
       </div>
     </div>
-  </aside>
+  </aside> <!-- /dbListView -->
+
+  </div> <!-- /dynamic-right-panel -->
+  </div> <!-- /appContainer -->
 
   <!-- Load Business Logic Script -->
   <script src="script.js"></script>
