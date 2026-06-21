@@ -140,18 +140,17 @@ document.addEventListener('DOMContentLoaded', () => {
     updateView(); // Initialize view text on load
   };
 
-  // Prefill defaults if empty or not set on load (prevents browser session state caching)
-  if (!inputName.value) inputName.value = "Vishnu R";
-  if (!selectCourse.value) selectCourse.value = "WEB DEVELOPMENT INTERNSHIP";
-  if (!inputCourse.value) inputCourse.value = "WEB DEVELOPMENT INTERNSHIP";
-  if (!inputStartDate.value) inputStartDate.value = "2026-06-08";
-  if (!inputEndDate.value) inputEndDate.value = "2026-06-18";
-  if (!inputDuration.value) inputDuration.value = "10 DAYS";
-  if (!selectDomain.value) selectDomain.value = "WEB DEVELOPMENT";
-  if (!inputDomain.value) inputDomain.value = "WEB DEVELOPMENT";
-  if (!inputIssueDate.value) inputIssueDate.value = "2026-06-20";
-  if (!inputCertId.value) inputCertId.value = "AT/INT/2026/0101";
-  if (!inputVerifyUrl.value) inputVerifyUrl.value = "aroxtech.com/veify";
+  // Ensure inputs start completely empty to show placeholders
+  if (!inputName.value) inputName.value = "";
+  if (!selectCourse.value) selectCourse.value = "";
+  if (!inputCourse.value) inputCourse.value = "";
+  if (!inputStartDate.value) inputStartDate.value = "";
+  if (!inputEndDate.value) inputEndDate.value = "";
+  if (!inputDuration.value) inputDuration.value = "";
+  if (!selectDomain.value) selectDomain.value = "";
+  if (!inputDomain.value) inputDomain.value = "";
+  if (!inputIssueDate.value) inputIssueDate.value = "";
+  if (!inputVerifyUrl.value) inputVerifyUrl.value = "";
 
   // Bind individual inputs to their preview segments with placeholders
   syncInput(inputName, viewName, '[Candidate Name]');

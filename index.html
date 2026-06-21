@@ -64,7 +64,8 @@
       <!-- Candidate Name -->
       <div class="form-group">
         <label for="inputName">Candidate Name</label>
-        <input type="text" id="inputName" placeholder="Enter Candidate Name">
+        <input type="text" id="inputName" placeholder="[Candidate Name]">
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: Sree Adchiya</small>
       </div>
 
       <!-- Internship/Course Name -->
@@ -79,7 +80,8 @@
           <option value="CYBERSECURITY INTERNSHIP">Cybersecurity Internship</option>
           <option value="other">Other (Custom)</option>
         </select>
-        <input type="text" id="inputCourse" class="custom-input-hidden" placeholder="Enter custom Internship Title">
+        <input type="text" id="inputCourse" class="custom-input-hidden" placeholder="[Internship/Course Title]">
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: Data Analytics</small>
       </div>
 
       <!-- Dates Row -->
@@ -87,10 +89,12 @@
         <div class="form-group">
           <label for="inputStartDate">Start Date</label>
           <input type="date" id="inputStartDate">
+          <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: 25 May 2026</small>
         </div>
         <div class="form-group">
           <label for="inputEndDate">End Date</label>
           <input type="date" id="inputEndDate">
+          <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: 12 June 2026</small>
         </div>
       </div>
 
@@ -98,7 +102,8 @@
       <div class="form-row">
         <div class="form-group">
           <label for="inputDuration">Duration</label>
-          <input type="text" id="inputDuration" placeholder="Enter Duration (e.g. 30 DAYS)">
+          <input type="text" id="inputDuration" placeholder="[Duration]">
+          <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: 15 DAYS</small>
         </div>
         <div class="form-group">
           <label for="selectDomain">Domain</label>
@@ -111,7 +116,8 @@
             <option value="CYBERSECURITY">Cybersecurity</option>
             <option value="other">Other (Custom)</option>
           </select>
-          <input type="text" id="inputDomain" class="custom-input-hidden" placeholder="Enter custom Domain">
+          <input type="text" id="inputDomain" class="custom-input-hidden" placeholder="[Domain]">
+          <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: Data Analytics</small>
         </div>
       </div>
 
@@ -119,27 +125,31 @@
       <div class="form-group">
         <label for="inputIssueDate">Date of Issue</label>
         <input type="date" id="inputIssueDate">
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: 15 June 2026</small>
       </div>
 
       <!-- Certificate ID (Auto-generatable) -->
       <div class="form-group">
         <label for="inputCertId">Certificate ID</label>
         <div class="input-with-action">
-          <input type="text" id="inputCertId" placeholder="Enter Certificate ID (e.g. AT/INT/2026/0101)">
+          <input type="text" id="inputCertId" placeholder="[Certificate ID]">
           <button type="button" id="btnGenId">Auto Gen</button>
         </div>
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: AT/INT/2026/0101</small>
       </div>
 
       <!-- Verification URL -->
       <div class="form-group">
         <label for="inputVerifyUrl">Verification URL</label>
-        <input type="text" id="inputVerifyUrl" placeholder="Enter Verification URL (e.g. aroxtech.in/verify)" value="aroxtech.in/verify">
+        <input type="text" id="inputVerifyUrl" placeholder="[Verification URL]">
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: aroxtech.in/verify</small>
       </div>
 
       <!-- Appreciation Paragraph -->
       <div class="form-group">
         <label for="inputDescription">Appreciation Text</label>
-        <textarea id="inputDescription" rows="3">During this internship, he/she was found to be dedicated, enthusiastic and hardworking. We wish him/her all the best for future endeavors.</textarea>
+        <textarea id="inputDescription" rows="3" placeholder="[Appreciation Text]"></textarea>
+        <small class="form-helper" style="display:block; margin-top:5px; color:#718096; font-size:11px;">Example: During this internship, he/she was found to be dedicated...</small>
       </div>
     </div>
 
