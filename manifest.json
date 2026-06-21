@@ -1,0 +1,17 @@
+{
+  "name": "AROX Certs",
+  "short_name": "AROX Certs",
+  "description": "AROX Tech Internship Certificate Generator and Database",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0A1F44",
+  "icons": [
+    {
+      "src": "assets/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

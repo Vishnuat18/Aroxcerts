@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Luxury Certificate Border System</title>
+    <style>
+        /* =========================================================
+           CSS STYLING & EXPORT-SAFE ARCHITECTURE
+           ========================================================= */
+        
+        :root {
+            --bg-color: #e5e7eb;
+            --cert-bg: #ffffff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        /* 
+         * A4 Export Compatibility 
+         * Fits perfectly inside 210mm x 297mm or 2480px x 3508px @ 300DPI
+         */
+        .certificate-wrapper {
+            position: relative;
+            width: 210mm;
+            height: 297mm;
+            background-color: var(--cert-bg);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            /* Scale down for live preview, but keeps native aspect ratio */
+            max-width: 100%;
+            max-height: 90vh;
+            aspect-ratio: 210 / 297;
+        }
+
+        /* 
+         * LAYER HIERARCHY
+         * Z-index management for border components
+         */
+        .luxury-border-system {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Print and Export Media Queries */
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .certificate-wrapper {
+                width: 100vw;
+                height: 100vh;
+                max-width: none;
+                max-height: none;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HTML STRUCTURE -->
+    <div class="certificate-wrapper">
+        
+        <!-- SVG BORDER SYSTEM -->
+        <svg class="luxury-border-system" viewBox="0 0 2480 3508" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- =========================================================
+                     GOLD EFFECTS & GRADIENTS
+                     ========================================================= -->
+                
+                <!-- Primary Luxury Metallic Gold Gradient -->
+                <linearGradient id="gold-metallic" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FFF4C4" />
+                    <stop offset="20%" stop-color="#FFD76A" />
+                    <stop offset="40%" stop-color="#E6B84D" />
+                    <stop offset="60%" stop-color="#B8860B" />
+                    <stop offset="80%" stop-color="#FFD76A" />
+                    <stop offset="100%" stop-color="#FFF4C4" />
+                </linearGradient>
+
+                <!-- High Gloss Reflection Gradient -->
+                <linearGradient id="gold-gloss" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9" />
+                    <stop offset="25%" stop-color="#FFD76A" stop-opacity="0.5" />
+                    <stop offset="50%" stop-color="#B8860B" stop-opacity="0.8" />
+                    <stop offset="75%" stop-color="#E6B84D" stop-opacity="0.5" />
+                    <stop offset="100%" stop-color="#FFF4C4" stop-opacity="0.9" />
+                </linearGradient>
+
+                <!-- Deep Luxury Navy Gradient for Panels -->
+                <linearGradient id="navy-panel" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#051433" />
+                    <stop offset="50%" stop-color="#0A1F44" />
+                    <stop offset="100%" stop-color="#030C22" />
+                </linearGradient>
+
+                <!-- Depth & Shadow Filters -->
+                <filter id="heavy-shadow" x="-10%" y="-10%" width="130%" height="130%">
+                    <feDropShadow dx="20" dy="20" stdDeviation="15" flood-color="#000000" flood-opacity="0.35" />
+                </filter>
+                
+                <filter id="light-shadow" x="-5%" y="-5%" width="120%" height="120%">
+                    <feDropShadow dx="8" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.2" />
+                </filter>
+                
+                <filter id="glow-effect" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="8" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
+
+            <!-- =========================================================
+                 FRAME SYSTEM
+                 ========================================================= -->
+            
+            <!-- Outer Frame (2px equivalent at 300dpi is ~8px stroke) -->
+            <rect x="80" y="80" width="2320" height="3348" fill="none" stroke="url(#gold-metallic)" stroke-width="8" filter="url(#light-shadow)" />
+            
+            <!-- Inner Frame (1px equivalent at 300dpi is ~4px stroke, gap ~60px) -->
+            <rect x="140" y="140" width="2200" height="3228" fill="none" stroke="url(#gold-metallic)" stroke-width="4" />
+
+            <!-- =========================================================
+                 SIDE DECORATIVE CONNECTORS
+                 ========================================================= -->
+            <g class="side-connectors" filter="url(#light-shadow)">
+                <!-- Top Center Edge -->
+                <rect x="1140" y="80" width="200" height="18" fill="url(#gold-metallic)" />
+                <rect x="1160" y="140" width="160" height="8" fill="url(#gold-metallic)" />
+                <polygon points="1220,148 1260,148 1240,168" fill="url(#gold-metallic)" />
+                
+                <!-- Bottom Center Edge -->
+                <rect x="1140" y="3410" width="200" height="18" fill="url(#gold-metallic)" />
+                <rect x="1160" y="3360" width="160" height="8" fill="url(#gold-metallic)" />
+                <polygon points="1220,3360 1260,3360 1240,3340" fill="url(#gold-metallic)" />
+                
+                <!-- Left Center Edge -->
+                <rect x="80" y="1654" width="18" height="200" fill="url(#gold-metallic)" />
+                <rect x="140" y="1674" width="8" height="160" fill="url(#gold-metallic)" />
+                <polygon points="148,1734 148,1774 168,1754" fill="url(#gold-metallic)" />
+                
+                <!-- Right Center Edge -->
+                <rect x="2382" y="1654" width="18" height="200" fill="url(#gold-metallic)" />
+                <rect x="2332" y="1674" width="8" height="160" fill="url(#gold-metallic)" />
+                <polygon points="2332,1734 2332,1774 2312,1754" fill="url(#gold-metallic)" />
+            </g>
+
+            <!-- =========================================================
+                 TOP LEFT CORNER SYSTEM
+                 ========================================================= -->
+            <g class="corner-top-left">
+                <!-- Layer 1: Deep Navy Panel -->
+                <polygon points="0,0 950,0 0,950" fill="url(#navy-panel)" filter="url(#heavy-shadow)" />
+                
+                <!-- Layer 2: Luxury Gold Metallic Strip -->
+                <polygon points="0,950 950,0 1010,0 0,1010" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                
+                <!-- Layer 3: White Accent Strip -->
+                <polygon points="0,1010 1010,0 1050,0 0,1050" fill="#FFFFFF" />
+                
+                <!-- Layer 4: Thin Gold Trim -->
+                <polygon points="0,1050 1050,0 1070,0 0,1070" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                
+                <!-- Layer 5: Gold Vertical Highlights (Reflective/Gloss effects) -->
+                <polygon points="250,0 320,0 0,320 0,250" fill="url(#gold-gloss)" opacity="0.6" />
+                <polygon points="500,0 540,0 0,540 0,500" fill="url(#gold-gloss)" opacity="0.4" />
+                
+                <!-- Decorative Corner Node -->
+                <circle cx="200" cy="200" r="30" fill="url(#gold-metallic)" filter="url(#light-shadow)"/>
+                <circle cx="200" cy="200" r="16" fill="#0A1F44" />
+                <circle cx="200" cy="200" r="6" fill="url(#gold-metallic)" />
+            </g>
+
+            <!-- =========================================================
+                 BOTTOM RIGHT CORNER SYSTEM
+                 ========================================================= -->
+            <!-- Mirrored perfectly using translate and rotate -->
+            <g class="corner-bottom-right" transform="translate(2480, 3508) rotate(180)">
+                <!-- Layer 1: Deep Navy Panel -->
+                <polygon points="0,0 950,0 0,950" fill="url(#navy-panel)" filter="url(#heavy-shadow)" />
+                
+                <!-- Layer 2: Luxury Gold Metallic Strip -->
+                <polygon points="0,950 950,0 1010,0 0,1010" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                
+                <!-- Layer 3: White Accent Strip -->
+                <polygon points="0,1010 1010,0 1050,0 0,1050" fill="#FFFFFF" />
+                
+                <!-- Layer 4: Thin Gold Trim -->
+                <polygon points="0,1050 1050,0 1070,0 0,1070" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                
+                <!-- Layer 5: Gold Vertical Highlights -->
+                <polygon points="250,0 320,0 0,320 0,250" fill="url(#gold-gloss)" opacity="0.6" />
+                <polygon points="500,0 540,0 0,540 0,500" fill="url(#gold-gloss)" opacity="0.4" />
+                
+                <!-- Decorative Corner Node -->
+                <circle cx="200" cy="200" r="30" fill="url(#gold-metallic)" filter="url(#light-shadow)"/>
+                <circle cx="200" cy="200" r="16" fill="#0A1F44" />
+                <circle cx="200" cy="200" r="6" fill="url(#gold-metallic)" />
+            </g>
+
+            <!-- =========================================================
+                 TOP RIGHT CONNECTOR SYSTEM (Circuit/Geometric)
+                 ========================================================= -->
+            <g class="connector-top-right" transform="translate(2480, 0)">
+                <!-- Corner Background Glow/Accent -->
+                <polygon points="-80,0 -400,0 -80,320" fill="url(#gold-metallic)" opacity="0.08" />
+
+                <!-- Gold Routing Lines & Circular Nodes -->
+                <!-- Path 1 (Inner) -->
+                <polyline points="-140,460 -220,460 -320,560 -540,560" fill="none" stroke="url(#gold-metallic)" stroke-width="8" filter="url(#light-shadow)" />
+                <circle cx="-540" cy="560" r="24" fill="url(#gold-metallic)" filter="url(#glow-effect)" />
+                <circle cx="-540" cy="560" r="12" fill="#FFFFFF" />
+                <circle cx="-540" cy="560" r="4" fill="url(#gold-metallic)" />
+                
+                <!-- Path 2 (Middle) -->
+                <polyline points="-80,750 -180,750 -280,850 -440,850 -520,930 -520,1050" fill="none" stroke="url(#gold-metallic)" stroke-width="8" filter="url(#light-shadow)" />
+                <circle cx="-520" cy="1050" r="24" fill="url(#gold-metallic)" filter="url(#glow-effect)" />
+                <circle cx="-520" cy="1050" r="12" fill="#FFFFFF" />
+                <circle cx="-520" cy="1050" r="4" fill="url(#gold-metallic)" />
+                
+                <!-- Path 3 (Top) -->
+                <polyline points="-460,140 -460,240 -560,340 -800,340" fill="none" stroke="url(#gold-metallic)" stroke-width="8" filter="url(#light-shadow)" />
+                <circle cx="-800" cy="340" r="24" fill="url(#gold-metallic)" filter="url(#glow-effect)" />
+                <circle cx="-800" cy="340" r="12" fill="#FFFFFF" />
+                <circle cx="-800" cy="340" r="4" fill="url(#gold-metallic)" />
+                
+                <!-- Double Gold Border Routing Override -->
+                <path d="M -80,140 L -280,140 L -400,260 L -400,460" fill="none" stroke="url(#gold-metallic)" stroke-width="14" filter="url(#heavy-shadow)" />
+                <path d="M -140,190 L -250,190 L -340,280 L -340,460" fill="none" stroke="url(#gold-metallic)" stroke-width="6" />
+                
+                <!-- Metallic Terminals at intersection -->
+                <rect x="-425" y="460" width="50" height="25" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                <rect x="-360" y="460" width="40" height="25" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                <rect x="-300" y="460" width="20" height="25" fill="url(#gold-metallic)" />
+            </g>
+
+            <!-- =========================================================
+                 BOTTOM LEFT CONNECTOR SYSTEM
+                 ========================================================= -->
+            <g class="connector-bottom-left" transform="translate(0, 3508)">
+                <!-- Corner Background Glow/Accent -->
+                <polygon points="80,0 400,0 80,-320" fill="url(#gold-metallic)" opacity="0.08" />
+
+                <!-- Gold Routing Lines & Circular Nodes -->
+                <!-- Path 1 (Inner) -->
+                <polyline points="140,-460 220,-460 320,-560 540,-560" fill="none" stroke="url(#gold-metallic)" stroke-width="8" filter="url(#light-shadow)" />
+                <circle cx="540" cy="-560" r="24" fill="url(#gold-metallic)" filter="url(#glow-effect)" />
+                <circle cx="540" cy="-560" r="12" fill="#FFFFFF" />
+                <circle cx="540" cy="-560" r="4" fill="url(#gold-metallic)" />
+                
+                <!-- Path 2 (Middle) -->
+                <polyline points="80,-750 180,-750 280,-850 440,-850 520,-930 520,-1050" fill="none" stroke="url(#gold-metallic)" stroke-width="8" filter="url(#light-shadow)" />
+                <circle cx="520" cy="-1050" r="24" fill="url(#gold-metallic)" filter="url(#glow-effect)" />
+                <circle cx="520" cy="-1050" r="12" fill="#FFFFFF" />
+                <circle cx="520" cy="-1050" r="4" fill="url(#gold-metallic)" />
+                
+                <!-- Path 3 (Bottom) -->
+                <polyline points="460,-140 460,-240 560,-340 800,-340" fill="none" stroke="url(#gold-metallic)" stroke-width="8" filter="url(#light-shadow)" />
+                <circle cx="800" cy="-340" r="24" fill="url(#gold-metallic)" filter="url(#glow-effect)" />
+                <circle cx="800" cy="-340" r="12" fill="#FFFFFF" />
+                <circle cx="800" cy="-340" r="4" fill="url(#gold-metallic)" />
+                
+                <!-- Double Gold Border Routing Override -->
+                <path d="M 80,-140 L 280,-140 L 400,-260 L 400,-460" fill="none" stroke="url(#gold-metallic)" stroke-width="14" filter="url(#heavy-shadow)" />
+                <path d="M 140,-190 L 250,-190 L 340,-280 L 340,-460" fill="none" stroke="url(#gold-metallic)" stroke-width="6" />
+                
+                <!-- Metallic Terminals at intersection -->
+                <rect x="375" y="-485" width="50" height="25" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                <rect x="320" y="-485" width="40" height="25" fill="url(#gold-metallic)" filter="url(#light-shadow)" />
+                <rect x="280" y="-485" width="20" height="25" fill="url(#gold-metallic)" />
+            </g>
+
+        </svg>
+    </div>
+
+</body>
+</html>
