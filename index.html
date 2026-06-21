@@ -17,6 +17,26 @@
 <body>
 
   <!-- ==========================================================================
+       LOGIN MODAL OVERLAY
+       ========================================================================== -->
+  <div class="login-overlay active" id="loginModal">
+    <div class="login-box">
+      <img src="assets/a logo.png" alt="Arox Logo" class="login-logo">
+      <h2>Arox Admin Login</h2>
+      <p>Please enter the admin password to continue.</p>
+      <input type="password" id="loginPassword" placeholder="Password">
+      <div id="loginError" class="login-error"></div>
+      <button class="btn-primary" id="btnLoginSubmit" style="width: 100%; justify-content: center;">Login</button>
+    </div>
+  </div>
+
+  <!-- Profile Icon -->
+  <div class="profile-icon" id="profileIcon" style="display: none;">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <span>Arox Admin</span>
+  </div>
+
+  <!-- ==========================================================================
        SIDEBAR: Certificate Editor Form Panel
        ========================================================================== -->
   <aside class="editor-panel" id="editorPanel">

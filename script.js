@@ -6,6 +6,47 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+  /* ==========================================================================
+     AUTHENTICATION LOGIC
+     ========================================================================== */
+  const loginModal = document.getElementById('loginModal');
+  const loginPassword = document.getElementById('loginPassword');
+  const btnLoginSubmit = document.getElementById('btnLoginSubmit');
+  const loginError = document.getElementById('loginError');
+  const profileIcon = document.getElementById('profileIcon');
+
+  const checkAuth = () => {
+    if (sessionStorage.getItem('arox_admin_auth') === 'true') {
+      if(loginModal) loginModal.classList.remove('active');
+      if(profileIcon) profileIcon.style.display = 'flex';
+    } else {
+      if(loginModal) loginModal.classList.add('active');
+      if(profileIcon) profileIcon.style.display = 'none';
+    }
+  };
+
+  const attemptLogin = () => {
+    if (loginPassword.value === 'arox2026') {
+      sessionStorage.setItem('arox_admin_auth', 'true');
+      if(loginError) loginError.textContent = '';
+      checkAuth();
+    } else {
+      if(loginError) loginError.textContent = 'Incorrect password.';
+      if(loginPassword) loginPassword.value = '';
+    }
+  };
+
+  if (btnLoginSubmit) {
+    btnLoginSubmit.addEventListener('click', attemptLogin);
+  }
+  if (loginPassword) {
+    loginPassword.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') attemptLogin();
+    });
+  }
+
+  checkAuth();
+
   // --- HTML Elements Cache ---
   const scaleWrapper = document.getElementById('certScaleWrapper');
   const certificate = document.getElementById('certificate');
