@@ -548,90 +548,170 @@ document.addEventListener('DOMContentLoaded', () => {
      ========================================================================== */
   const DB_KEY = 'aroxtech_certificates';
 
+  let editingDbId = null;
+  const btnAddDbText = document.getElementById('btnAddDbText');
+  const btnCancelEdit = document.getElementById('btnCancelEdit');
+
   const saveToDatabase = () => {
-    if (!inputName.value.trim() || !inputCertId.value.trim()) {
-      return; // Need basics to save
-    }
+    if (!inputName.value.trim() || !inputCertId.value.trim()) return;
 
     const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-    const existingIndex = records.findIndex(r => r.cert_id === inputCertId.value.trim());
     
-    const newRecord = {
-      db_id: existingIndex >= 0 ? records[existingIndex].db_id : records.length + 1,
-      student_name: inputName.value.trim(),
-      internship_details: inputCourse.value.trim() || selectCourse.value,
-      start_date: inputStartDate.value,
-      end_date: inputEndDate.value,
-      total_days: inputDuration.value.trim(),
-      cert_id: inputCertId.value.trim(),
-      timestamp: new Date().toISOString()
-    };
-    
-    if (existingIndex >= 0 && newRecord.cert_id !== '') {
-      records[existingIndex] = newRecord;
+    if (editingDbId !== null) {
+      // UPDATE existing
+      const idx = records.findIndex(r => r.db_id === editingDbId);
+      if (idx >= 0) {
+        records[idx].student_name = inputName.value.trim();
+        records[idx].internship_details = inputCourse.value.trim() || selectCourse.value;
+        records[idx].start_date = inputStartDate.value;
+        records[idx].end_date = inputEndDate.value;
+        records[idx].total_days = inputDuration.value.trim();
+        records[idx].cert_id = inputCertId.value.trim();
+        records[idx].timestamp = new Date().toISOString();
+      }
+      editingDbId = null;
+      if (btnAddDbText) btnAddDbText.textContent = "Add to Database";
+      if (btnCancelEdit) btnCancelEdit.style.display = "none";
     } else {
-      records.push(newRecord);
+      // CREATE new
+      const existingIndex = records.findIndex(r => r.cert_id === inputCertId.value.trim());
+      const newRecord = {
+        db_id: Date.now(), // unique ID
+        student_name: inputName.value.trim(),
+        internship_details: inputCourse.value.trim() || selectCourse.value,
+        start_date: inputStartDate.value,
+        end_date: inputEndDate.value,
+        total_days: inputDuration.value.trim(),
+        cert_id: inputCertId.value.trim(),
+        timestamp: new Date().toISOString()
+      };
+      if (existingIndex >= 0 && newRecord.cert_id !== '') {
+        records[existingIndex] = newRecord; // overwrite if same cert id
+      } else {
+        records.push(newRecord);
+      }
     }
+    
     localStorage.setItem(DB_KEY, JSON.stringify(records));
     if (typeof renderDatabase === 'function') renderDatabase();
   };
 
+  if (btnCancelEdit) {
+    btnCancelEdit.addEventListener('click', () => {
+      editingDbId = null;
+      if (btnAddDbText) btnAddDbText.textContent = "Add to Database";
+      btnCancelEdit.style.display = "none";
+      advanceCertId(); // reset to next new ID
+    });
+  }
+
   btnDownloadPdf.addEventListener('click', () => {
     saveToDatabase();
-    advanceCertId(); // Auto advance after downloading PDF
+    if (editingDbId === null) advanceCertId();
   });
   
   btnDownloadPng.addEventListener('click', () => {
     saveToDatabase();
-    advanceCertId(); // Auto advance after downloading PNG
+    if (editingDbId === null) advanceCertId();
   });
   
   const btnAddDb = document.getElementById('btnAddDb');
   if (btnAddDb) {
     btnAddDb.addEventListener('click', () => {
       saveToDatabase();
-      advanceCertId(); // Auto advance after adding to DB
-      alert("Saved to Database successfully!");
+      if (editingDbId === null) advanceCertId();
     });
   }
 
-  const btnViewDb = document.getElementById('btnViewDb');
-  const btnCloseDb = document.getElementById('btnCloseDb');
-  const dbModal = document.getElementById('dbModal');
   const dbTableBody = document.getElementById('dbTableBody');
   const btnExportCsv = document.getElementById('btnExportCsv');
   const btnClearDb = document.getElementById('btnClearDb');
 
-  const renderDatabase = () => {
+  window.editRecord = (id) => {
     const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-    dbTableBody.innerHTML = '';
-    records.forEach(rec => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${rec.db_id}</td>
-        <td>${rec.student_name}</td>
-        <td>${rec.internship_details}</td>
-        <td>${rec.start_date}</td>
-        <td>${rec.end_date}</td>
-        <td>${rec.total_days}</td>
-        <td>${rec.cert_id}</td>
-      `;
-      dbTableBody.appendChild(tr);
-    });
+    const rec = records.find(r => r.db_id === id);
+    if (!rec) return;
+    
+    inputName.value = rec.student_name;
+    inputStartDate.value = rec.start_date;
+    inputEndDate.value = rec.end_date;
+    inputDuration.value = rec.total_days;
+    inputCertId.value = rec.cert_id;
+    
+    // course dropdown
+    const optionExists = Array.from(selectCourse.options).some(opt => opt.value === rec.internship_details);
+    if (optionExists) {
+      selectCourse.value = rec.internship_details;
+      inputCourse.style.display = 'none';
+      inputCourse.value = '';
+    } else {
+      selectCourse.value = 'other';
+      inputCourse.style.display = 'block';
+      inputCourse.value = rec.internship_details;
+    }
+    
+    // update previews by triggering change logic
+    viewName.textContent = rec.student_name;
+    viewCourse.textContent = rec.internship_details;
+    // We would need to manually trigger the date formatting logic or just set it:
+    const startObj = new Date(rec.start_date);
+    const endObj = new Date(rec.end_date);
+    const issueObj = new Date(); // keeping issue date as today
+    const formatOpts = { day: '2-digit', month: 'long', year: 'numeric' };
+    
+    if(!isNaN(startObj)) viewStartDate.textContent = startObj.toLocaleDateString('en-GB', formatOpts);
+    if(!isNaN(endObj)) viewEndDate.textContent = endObj.toLocaleDateString('en-GB', formatOpts);
+    viewDuration.textContent = rec.total_days;
+    viewCertId.textContent = rec.cert_id;
+    
+    editingDbId = id;
+    if (btnAddDbText) btnAddDbText.textContent = "Update Record";
+    if (btnCancelEdit) btnCancelEdit.style.display = "block";
   };
 
-  if(btnViewDb) {
-    btnViewDb.addEventListener('click', () => {
+  window.deleteRecord = (id) => {
+    if (confirm('Are you sure you want to delete this record?')) {
+      let records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
+      records = records.filter(r => r.db_id !== id);
+      localStorage.setItem(DB_KEY, JSON.stringify(records));
       renderDatabase();
-      dbModal.classList.add('active');
-    });
-  }
+    }
+  };
 
-  if(btnCloseDb) {
-    btnCloseDb.addEventListener('click', () => {
-      dbModal.classList.remove('active');
+  const renderDatabase = () => {
+    if (!dbTableBody) return;
+    const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
+    dbTableBody.innerHTML = '';
+    
+    if (records.length === 0) {
+      dbTableBody.innerHTML = '<div style="padding: 20px; text-align: center; color: #a0aec0; font-size: 13px;">No certificates generated yet.</div>';
+      return;
+    }
+
+    // sort newest first
+    const sortedRecords = [...records].sort((a,b) => b.db_id - a.db_id);
+    
+    sortedRecords.forEach(rec => {
+      const item = document.createElement('div');
+      item.className = 'db-item';
+      item.innerHTML = `
+        <div class="db-item-header">
+          <span class="db-item-id">${rec.cert_id}</span>
+        </div>
+        <div class="db-item-name">${rec.student_name}</div>
+        <div class="db-item-course">${rec.internship_details}</div>
+        <div class="db-item-actions">
+          <button class="btn-edit" onclick="editRecord(${rec.db_id})">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
+          </button>
+          <button class="btn-delete" onclick="deleteRecord(${rec.db_id})">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Del
+          </button>
+        </div>
+      `;
+      dbTableBody.appendChild(item);
     });
-  }
+  };
 
   if(btnClearDb) {
     btnClearDb.addEventListener('click', () => {
@@ -677,6 +757,9 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.removeChild(link);
     });
   }
+
+  // Initialize Right Panel view
+  renderDatabase();
 
   // Initialize auto ID on page load
   advanceCertId();

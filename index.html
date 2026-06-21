@@ -145,28 +145,12 @@
 
     <!-- Actions Footer -->
     <div class="editor-footer">
-      <button class="btn-primary" id="btnDownloadPdf">
-        <!-- PDF Icon SVG -->
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-        Download PDF (A4 HQ)
-      </button>
-      <div class="btn-secondary-row">
-        <button class="btn-secondary" id="btnDownloadPng">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Save PNG
-        </button>
-        <button class="btn-secondary" id="btnPrint">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print
-        </button>
-      </div>
-      <button class="btn-primary" id="btnAddDb" style="margin-top: 10px; width: 100%; background: #0A1F44;">
+      <button class="btn-primary" id="btnAddDb" style="width: 100%; background: #0A1F44;">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-        Add to Database
+        <span id="btnAddDbText">Add to Database</span>
       </button>
-      <button class="btn-secondary" id="btnViewDb" style="margin-top: 10px; width: 100%;">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-        View Database
+      <button class="btn-secondary" id="btnCancelEdit" style="margin-top: 10px; width: 100%; display: none; color: var(--accent-orange); border-color: rgba(242, 101, 34, 0.3);">
+        Cancel Edit
       </button>
     </div>
   </aside>
@@ -547,42 +531,45 @@
     </div> <!-- /preview-scroller -->
   </main>
 
-  <!-- Load Business Logic Script -->
-  <script src="script.js"></script>
-
   <!-- ==========================================================================
-       DATABASE MODAL OVERLAY
+       RIGHT PANEL: Database & Export Actions
        ========================================================================== -->
-  <div class="db-modal-overlay" id="dbModal">
-    <div class="db-modal-content">
-      <div class="db-modal-header">
-        <h2>Generated Certificates Database</h2>
-        <button class="db-close-btn" id="btnCloseDb">&times;</button>
-      </div>
-      <div class="db-modal-body">
-        <table class="db-table" id="dbTable">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Student Name</th>
-              <th>Internship Details</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>Total Days</th>
-              <th>Cert ID</th>
-            </tr>
-          </thead>
-          <tbody id="dbTableBody">
-            <!-- Data will be populated here -->
-          </tbody>
-        </table>
-      </div>
-      <div class="db-modal-footer">
-        <button class="btn-primary" id="btnExportCsv">Export to CSV</button>
-        <button class="btn-secondary" id="btnClearDb" style="color: #ff4d4d; border-color: rgba(255,77,77,0.3);">Clear Database</button>
+  <aside class="database-panel" id="databasePanel">
+    <div class="db-panel-header">
+      <h2>Generated Certificates</h2>
+      <p>Click a record to edit or delete</p>
+    </div>
+    
+    <div class="db-panel-body">
+      <div class="db-list" id="dbTableBody">
+        <!-- DB Items will be populated here -->
       </div>
     </div>
-  </div>
+    
+    <div class="db-panel-footer">
+      <button class="btn-primary" id="btnDownloadPdf" style="margin-bottom: 10px; width: 100%;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Download PDF
+      </button>
+      <div class="btn-secondary-row" style="margin-bottom: 10px;">
+        <button class="btn-secondary" id="btnDownloadPng" style="flex: 1;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Save PNG
+        </button>
+        <button class="btn-secondary" id="btnPrint" style="flex: 1;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+      </div>
+      <div class="btn-secondary-row">
+        <button class="btn-secondary" id="btnExportCsv" style="flex: 1;">Export CSV</button>
+        <button class="btn-secondary" id="btnClearDb" style="flex: 1; color: #ff4d4d; border-color: rgba(255,77,77,0.3);">Clear All</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Load Business Logic Script -->
+  <script src="script.js"></script>
 
   <script>
     if ('serviceWorker' in navigator) {
