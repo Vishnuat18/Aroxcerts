@@ -473,13 +473,23 @@ document.addEventListener('DOMContentLoaded', () => {
         backgroundColor: '#ffffff',
         logging: false
       }).then(canvas => {
-        const link = document.createElement('a');
-        const formattedName = inputName.value.trim().toLowerCase().replace(/\s+/g, '_');
-        link.download = `${formattedName}_internship_certificate.png`;
-        link.href = canvas.toDataURL('image/png', 1.0);
-        link.click();
-        
-        restoreCallback();
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            console.error('Canvas to Blob failed.');
+            restoreCallback();
+            alert('PNG export failed. Please try a different browser.');
+            return;
+          }
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          const formattedName = inputName.value.trim().toLowerCase().replace(/\s+/g, '_');
+          link.download = `${formattedName}_internship_certificate.png`;
+          link.href = blobUrl;
+          link.click();
+          
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+          restoreCallback();
+        }, 'image/png', 1.0);
       }).catch(err => {
         console.error('PNG export failed:', err);
         restoreCallback();
@@ -501,8 +511,6 @@ document.addEventListener('DOMContentLoaded', () => {
         logging: false,
         imageTimeout: 0
       }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        
         // Setup jsPDF context
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({
@@ -512,7 +520,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         // Exactly fill 210mm x 297mm
-        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+        // jsPDF supports passing the canvas element directly!
+        pdf.addImage(canvas, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
         
         const formattedName = inputName.value.trim().toLowerCase().replace(/\s+/g, '_');
         pdf.save(`${formattedName}_internship_certificate.pdf`);

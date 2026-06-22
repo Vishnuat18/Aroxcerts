@@ -1840,6 +1840,16 @@ body {
   background: #ffffff;
   border-top: 1px solid #E2E8F0;
 }
+/* ==========================================================================
+   PRINT LAYOUT
+   ========================================================================== */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
 
  / *   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
        M O B I L E   R E S P O N S I V E N E S S 
