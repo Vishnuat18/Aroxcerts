@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arox-certs-v1';
+const CACHE_NAME = 'arox-certs-v2';
 const urlsToCache = [
   './',
   './index.html',
@@ -23,16 +23,20 @@ self.addEventListener('install', event => {
 
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
+        // Update cache dynamically
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
         }
-        return fetch(event.request).catch(() => {
-          // Fallback if offline and not in cache
-          console.log('Offline and resource not cached:', event.request.url);
-        });
+        return response;
+      })
+      .catch(() => {
+        // Fallback to cache if offline
+        return caches.match(event.request);
       })
   );
 });

@@ -17,21 +17,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const appContainer = document.getElementById('appContainer');
 
   const checkAuth = () => {
-    // Force strict login: Ignore sessionStorage and force popup on reload
-    if(loginModal) loginModal.classList.add('active');
-    if(profileIcon) profileIcon.style.display = 'none';
-    if(appContainer) appContainer.style.display = 'none';
+    if (sessionStorage.getItem('arox_admin_auth') === 'true') {
+      if(loginModal) loginModal.classList.remove('active');
+      if(profileIcon) profileIcon.style.display = 'flex';
+      if(appContainer) appContainer.style.display = 'flex';
+    } else {
+      if(loginModal) loginModal.classList.add('active');
+      if(profileIcon) profileIcon.style.display = 'none';
+      if(appContainer) appContainer.style.display = 'none';
+    }
   };
 
   const attemptLogin = () => {
     if (loginPassword.value === 'arox2026') {
+      sessionStorage.setItem('arox_admin_auth', 'true');
       if(loginModal) loginModal.classList.remove('active');
       if(profileIcon) profileIcon.style.display = 'flex';
       if(appContainer) appContainer.style.display = 'flex';
       if(loginError) loginError.textContent = '';
       
       // Calculate layout now that it's visible
-      if (typeof updateScale === 'function') setTimeout(updateScale, 50);
+      if (typeof adjustPreviewScale === 'function') setTimeout(adjustPreviewScale, 50);
     } else {
       if(loginError) loginError.textContent = 'Incorrect password.';
       if(loginPassword) loginPassword.value = '';
@@ -643,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const showCertView = () => {
     if(dbListView) dbListView.style.display = 'none';
     if(certPreviewView) certPreviewView.style.display = 'flex';
-    if (typeof updateScale === 'function') setTimeout(updateScale, 50);
+    if (typeof adjustPreviewScale === 'function') setTimeout(adjustPreviewScale, 50);
   };
 
   if(btnViewDb) {
@@ -741,7 +747,12 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="db-item-id">${rec.cert_id}</span>
         </div>
         <div class="db-item-name">${rec.student_name}</div>
-        <div class="db-item-course">${rec.internship_details}</div>
+        <div class="db-item-course" style="font-weight: 500; margin-bottom: 5px;">${rec.internship_details}</div>
+        <div class="db-item-details" style="font-size: 11px; color: #718096; margin-bottom: 10px; line-height: 1.4;">
+          <div><strong>Start:</strong> ${rec.start_date || 'N/A'}</div>
+          <div><strong>End:</strong> ${rec.end_date || 'N/A'}</div>
+          <div><strong>Duration:</strong> ${rec.total_days || 'N/A'}</div>
+        </div>
         <div class="db-item-actions">
           <button class="btn-edit" onclick="editRecord(${rec.db_id})">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
