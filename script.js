@@ -29,17 +29,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginPassword = document.getElementById('loginPassword');
   const btnLoginSubmit = document.getElementById('btnLoginSubmit');
   const loginError = document.getElementById('loginError');
-  const profileIcon = document.getElementById('profileIcon');
+
   const appContainer = document.getElementById('appContainer');
 
   const checkAuth = () => {
     if (sessionStorage.getItem('arox_admin_auth') === 'true') {
       if(loginModal) loginModal.classList.remove('active');
-      if(profileIcon) profileIcon.style.display = 'flex';
+
       if(appContainer) appContainer.style.display = 'flex';
     } else {
       if(loginModal) loginModal.classList.add('active');
-      if(profileIcon) profileIcon.style.display = 'none';
+
       if(appContainer) appContainer.style.display = 'none';
     }
   };
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginPassword.value === 'arox2026') {
       sessionStorage.setItem('arox_admin_auth', 'true');
       if(loginModal) loginModal.classList.remove('active');
-      if(profileIcon) profileIcon.style.display = 'flex';
+
       if(appContainer) appContainer.style.display = 'flex';
       if(loginError) loginError.textContent = '';
       
