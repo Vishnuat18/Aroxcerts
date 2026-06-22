@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       callback(() => {
         // Restore styling after output completion
-        scaleWrapper.style.transform = originalTransform;
+        if (typeof adjustPreviewScale === 'function') adjustPreviewScale();
         if (exportWrapper) {
           exportWrapper.style.boxShadow = originalShadow;
         }
@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
     prepareCapture((restoreCallback) => {
       const exportWrapper = document.getElementById('export-wrapper');
       html2canvas(exportWrapper, {
-        scale: 4,
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         imageTimeout: 0,
@@ -504,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     prepareCapture((restoreCallback) => {
       const exportWrapper = document.getElementById('export-wrapper');
       html2canvas(exportWrapper, {
-        scale: 4,
+        scale: 2,
         backgroundColor: "#ffffff",
         useCORS: true,
         allowTaint: true,
