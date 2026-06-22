@@ -4,6 +4,22 @@
    form validation alerts, scale previewing, and PDF/PNG exports.
    ========================================================================== */
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBBvJuEq70b1JGqC83YFJy_4780B24S0bM",
+  authDomain: "arox-48513.firebaseapp.com",
+  projectId: "arox-48513",
+  storageBucket: "arox-48513.firebasestorage.app",
+  messagingSenderId: "317254519087",
+  appId: "1:317254519087:web:8d0478c26094cc470739da"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const DB_COLLECTION = 'aroxtech_certificates';
+
 document.addEventListener('DOMContentLoaded', () => {
 
   /* ==========================================================================
@@ -424,6 +440,11 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) {
         console.warn('Asset loading warning:', e);
       }
+
+      // Hide export buttons before capture
+      const exportFooter = document.querySelector('.cert-export-footer');
+      if (exportFooter) exportFooter.style.display = 'none';
+
       callback(() => {
         // Restore styling after output completion
         scaleWrapper.style.transform = originalTransform;
@@ -434,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
           scroller.style.width = originalScrollerWidth;
           scroller.style.height = originalScrollerHeight;
         }
+        if (exportFooter) exportFooter.style.display = 'flex';
       });
     }, 150);
   }
@@ -520,12 +542,20 @@ document.addEventListener('DOMContentLoaded', () => {
     
     scaleWrapper.style.transform = `scale(${scale})`;
     scaleWrapper.style.transformOrigin = 'center center';
+
+    // Hide the floating export buttons during print
+    const exportFooter = document.querySelector('.cert-export-footer');
+    if (exportFooter) exportFooter.style.display = 'none';
   });
 
   window.addEventListener('afterprint', () => {
     // Restore normal preview scaling
     scaleWrapper.style.transformOrigin = 'top center';
     adjustPreviewScale();
+
+    // Show the floating export buttons after print
+    const exportFooter = document.querySelector('.cert-export-footer');
+    if (exportFooter) exportFooter.style.display = 'flex';
   });
 
   // --- Print Command ---
@@ -556,39 +586,18 @@ document.addEventListener('DOMContentLoaded', () => {
   inputEndDate.addEventListener('change', calculateDuration);
 
   /* ==========================================================================
-     LOCAL STORAGE DATABASE
+     FIREBASE DATABASE & VIEWS
      ========================================================================== */
-  const DB_KEY = 'aroxtech_certificates';
-
   let editingDbId = null;
+  let currentDbView = 'grid'; // 'grid' or 'table'
   const btnAddDbText = document.getElementById('btnAddDbText');
   const btnCancelEdit = document.getElementById('btnCancelEdit');
 
-  const saveToDatabase = () => {
+  const saveToDatabase = async () => {
     if (!inputName.value.trim() || !inputCertId.value.trim()) return;
 
-    const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-    
-    if (editingDbId !== null) {
-      // UPDATE existing
-      const idx = records.findIndex(r => r.db_id === editingDbId);
-      if (idx >= 0) {
-        records[idx].student_name = inputName.value.trim();
-        records[idx].internship_details = inputCourse.value.trim() || selectCourse.value;
-        records[idx].start_date = inputStartDate.value;
-        records[idx].end_date = inputEndDate.value;
-        records[idx].total_days = inputDuration.value.trim();
-        records[idx].cert_id = inputCertId.value.trim();
-        records[idx].timestamp = new Date().toISOString();
-      }
-      editingDbId = null;
-      if (btnAddDbText) btnAddDbText.textContent = "Add to Database";
-      if (btnCancelEdit) btnCancelEdit.style.display = "none";
-    } else {
-      // CREATE new
-      const existingIndex = records.findIndex(r => r.cert_id === inputCertId.value.trim());
-      const newRecord = {
-        db_id: Date.now(), // unique ID
+    try {
+      const recordData = {
         student_name: inputName.value.trim(),
         internship_details: inputCourse.value.trim() || selectCourse.value,
         start_date: inputStartDate.value,
@@ -597,15 +606,26 @@ document.addEventListener('DOMContentLoaded', () => {
         cert_id: inputCertId.value.trim(),
         timestamp: new Date().toISOString()
       };
-      if (existingIndex >= 0 && newRecord.cert_id !== '') {
-        records[existingIndex] = newRecord; // overwrite if same cert id
+
+      if (editingDbId !== null) {
+        // UPDATE existing
+        const docRef = doc(db, DB_COLLECTION, editingDbId);
+        await setDoc(docRef, recordData, { merge: true });
+        editingDbId = null;
+        if (btnAddDbText) btnAddDbText.textContent = "Add to Database";
+        if (btnCancelEdit) btnCancelEdit.style.display = "none";
       } else {
-        records.push(newRecord);
+        // CREATE new
+        recordData.db_id = Date.now().toString(); // unique ID
+        const docRef = doc(db, DB_COLLECTION, recordData.db_id);
+        await setDoc(docRef, recordData);
       }
+      
+      if (typeof renderDatabase === 'function') renderDatabase();
+    } catch (e) {
+      console.error("Error saving to database: ", e);
+      alert("Failed to save to cloud database. Check console.");
     }
-    
-    localStorage.setItem(DB_KEY, JSON.stringify(records));
-    if (typeof renderDatabase === 'function') renderDatabase();
   };
 
   if (btnCancelEdit) {
@@ -667,149 +687,323 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnExportCsv = document.getElementById('btnExportCsv');
   const btnClearDb = document.getElementById('btnClearDb');
 
-  window.editRecord = (id) => {
-    const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-    const rec = records.find(r => r.db_id === id);
-    if (!rec) return;
-    
-    inputName.value = rec.student_name;
-    inputStartDate.value = rec.start_date;
-    inputEndDate.value = rec.end_date;
-    inputDuration.value = rec.total_days;
-    inputCertId.value = rec.cert_id;
-    
-    if (inputCertYear && inputCertNum && rec.cert_id) {
-      const parts = rec.cert_id.split('/');
-      if (parts.length >= 4) {
-        inputCertYear.value = parts[2];
-        inputCertNum.value = parts[3];
+  window.editRecord = async (id) => {
+    try {
+      const q = query(collection(db, DB_COLLECTION));
+      const querySnapshot = await getDocs(q);
+      let rec = null;
+      querySnapshot.forEach(doc => {
+        if (doc.data().db_id === id.toString() || doc.id === id.toString()) rec = doc.data();
+      });
+      if (!rec) return;
+      
+      inputName.value = rec.student_name;
+      inputStartDate.value = rec.start_date;
+      inputEndDate.value = rec.end_date;
+      inputDuration.value = rec.total_days;
+      inputCertId.value = rec.cert_id;
+      
+      if (inputCertYear && inputCertNum && rec.cert_id) {
+        const parts = rec.cert_id.split('/');
+        if (parts.length >= 4) {
+          inputCertYear.value = parts[2];
+          inputCertNum.value = parts[3];
+        }
       }
-    }
-    
-    // course dropdown
-    const optionExists = Array.from(selectCourse.options).some(opt => opt.value === rec.internship_details);
-    if (optionExists) {
-      selectCourse.value = rec.internship_details;
-      inputCourse.style.display = 'none';
-      inputCourse.value = '';
-    } else {
-      selectCourse.value = 'other';
-      inputCourse.style.display = 'block';
-      inputCourse.value = rec.internship_details;
-    }
-    
-    // update previews by triggering change logic
-    viewName.textContent = rec.student_name;
-    viewCourse.textContent = rec.internship_details;
-    // We would need to manually trigger the date formatting logic or just set it:
-    const startObj = new Date(rec.start_date);
-    const endObj = new Date(rec.end_date);
-    const issueObj = new Date(); // keeping issue date as today
-    const formatOpts = { day: '2-digit', month: 'long', year: 'numeric' };
-    
-    if(!isNaN(startObj)) viewStartDate.textContent = startObj.toLocaleDateString('en-GB', formatOpts);
-    if(!isNaN(endObj)) viewEndDate.textContent = endObj.toLocaleDateString('en-GB', formatOpts);
-    viewDuration.textContent = rec.total_days;
-    viewCertId.textContent = rec.cert_id;
-    
-    editingDbId = id;
-    if (btnAddDbText) btnAddDbText.textContent = "Update Record";
-    if (btnCancelEdit) btnCancelEdit.style.display = "block";
+      
+      const optionExists = Array.from(selectCourse.options).some(opt => opt.value === rec.internship_details);
+      if (optionExists) {
+        selectCourse.value = rec.internship_details;
+        inputCourse.style.display = 'none';
+        inputCourse.value = '';
+      } else {
+        selectCourse.value = 'other';
+        inputCourse.style.display = 'block';
+        inputCourse.value = rec.internship_details;
+      }
+      
+      // Update preview directly
+      viewName.textContent = rec.student_name;
+      viewCourse.textContent = rec.internship_details;
+      const startObj = new Date(rec.start_date);
+      const endObj = new Date(rec.end_date);
+      const formatOpts = { day: '2-digit', month: 'long', year: 'numeric' };
+      if(!isNaN(startObj)) viewStartDate.textContent = startObj.toLocaleDateString('en-GB', formatOpts);
+      if(!isNaN(endObj)) viewEndDate.textContent = endObj.toLocaleDateString('en-GB', formatOpts);
+      viewDuration.textContent = rec.total_days;
+      viewCertId.textContent = rec.cert_id;
+      
+      editingDbId = id.toString();
+      if (btnAddDbText) btnAddDbText.textContent = "Update Record";
+      if (btnCancelEdit) btnCancelEdit.style.display = "block";
+    } catch(e) { console.error(e); }
   };
 
-  window.deleteRecord = (id) => {
+  window.deleteRecord = async (id, event) => {
+    if(event) event.stopPropagation();
     if (confirm('Are you sure you want to delete this record?')) {
-      let records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-      records = records.filter(r => r.db_id !== id);
-      localStorage.setItem(DB_KEY, JSON.stringify(records));
-      renderDatabase();
+      try {
+        await deleteDoc(doc(db, DB_COLLECTION, id.toString()));
+        renderDatabase();
+      } catch (e) { console.error("Error deleting document: ", e); }
     }
   };
 
-  const renderDatabase = () => {
+  const renderDatabase = async () => {
     if (!dbTableBody) return;
-    const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-    dbTableBody.innerHTML = '';
     
-    if (records.length === 0) {
-      dbTableBody.innerHTML = '<div style="padding: 20px; text-align: center; color: #a0aec0; font-size: 13px;">No certificates generated yet.</div>';
-      return;
-    }
+    try {
+      const q = query(collection(db, DB_COLLECTION), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const records = [];
+      querySnapshot.forEach((doc) => {
+        records.push({ id: doc.id, ...doc.data() });
+      });
+      
+      dbTableBody.innerHTML = '';
+      if (records.length === 0) {
+        dbTableBody.innerHTML = '<div style="padding: 20px; text-align: center; color: #a0aec0; font-size: 13px; grid-column: 1/-1;">No certificates generated yet.</div>';
+        return;
+      }
 
-    // sort newest first
-    const sortedRecords = [...records].sort((a,b) => b.db_id - a.db_id);
-    
-    sortedRecords.forEach(rec => {
-      const item = document.createElement('div');
-      item.className = 'db-item';
-      item.innerHTML = `
-        <div class="db-item-header">
-          <span class="db-item-id">${rec.cert_id}</span>
-        </div>
-        <div class="db-item-name">${rec.student_name}</div>
-        <div class="db-item-course" style="font-weight: 500; margin-bottom: 5px;">${rec.internship_details}</div>
-        <div class="db-item-details" style="font-size: 11px; color: #718096; margin-bottom: 10px; line-height: 1.4;">
-          <div><strong>Start:</strong> ${rec.start_date || 'N/A'}</div>
-          <div><strong>End:</strong> ${rec.end_date || 'N/A'}</div>
-          <div><strong>Duration:</strong> ${rec.total_days || 'N/A'}</div>
-        </div>
-        <div class="db-item-actions">
-          <button class="btn-edit" onclick="editRecord(${rec.db_id})">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
-          </button>
-          <button class="btn-delete" onclick="deleteRecord(${rec.db_id})">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Del
-          </button>
-        </div>
-      `;
-      dbTableBody.appendChild(item);
-    });
+      if (currentDbView === 'grid') {
+        dbTableBody.style.display = 'grid';
+        dbTableBody.style.gridTemplateColumns = 'repeat(auto-fill, minmax(300px, 1fr))';
+        dbTableBody.style.gap = '15px';
+        
+        records.forEach(rec => {
+          const item = document.createElement('div');
+          item.className = 'db-item';
+          item.style.cursor = 'pointer';
+          item.onclick = () => window.viewRecordModal(rec.id);
+          item.innerHTML = `
+            <div class="db-item-header">
+              <span class="db-item-id">${rec.cert_id}</span>
+            </div>
+            <div class="db-item-name">${rec.student_name}</div>
+            <div class="db-item-course" style="font-weight: 500; margin-bottom: 5px;">${rec.internship_details}</div>
+            <div class="db-item-details" style="font-size: 11px; color: #718096; margin-bottom: 10px; line-height: 1.4;">
+              <div><strong>Start:</strong> ${rec.start_date || 'N/A'}</div>
+              <div><strong>End:</strong> ${rec.end_date || 'N/A'}</div>
+              <div><strong>Duration:</strong> ${rec.total_days || 'N/A'}</div>
+            </div>
+            <div class="db-item-actions">
+              <button class="btn-edit" onclick="event.stopPropagation(); editRecord('${rec.id}')">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
+              </button>
+              <button class="btn-delete" onclick="deleteRecord('${rec.id}', event)">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Del
+              </button>
+            </div>
+          `;
+          dbTableBody.appendChild(item);
+        });
+      } else {
+        // Table View
+        dbTableBody.style.display = 'block';
+        let html = `
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+            <thead>
+              <tr style="background: var(--bg-light); border-bottom: 2px solid #e2e8f0; color: var(--primary-navy);">
+                <th style="padding: 12px 15px;">Cert ID</th>
+                <th style="padding: 12px 15px;">Name</th>
+                <th style="padding: 12px 15px;">Course</th>
+                <th style="padding: 12px 15px;">Duration</th>
+                <th style="padding: 12px 15px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        records.forEach(rec => {
+          html += `
+            <tr style="border-bottom: 1px solid #edf2f7; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='#fff'" onclick="window.viewRecordModal('${rec.id}')">
+              <td style="padding: 12px 15px; font-weight: 600; color: var(--primary-gold);">${rec.cert_id}</td>
+              <td style="padding: 12px 15px; font-weight: 600; color: var(--primary-navy);">${rec.student_name}</td>
+              <td style="padding: 12px 15px; color: #4a5568;">${rec.internship_details}</td>
+              <td style="padding: 12px 15px; color: #718096;">${rec.total_days}</td>
+              <td style="padding: 12px 15px;">
+                <button onclick="event.stopPropagation(); editRecord('${rec.id}')" style="background:transparent; border:none; color:var(--primary-navy); cursor:pointer; margin-right:8px;" title="Edit">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button onclick="deleteRecord('${rec.id}', event)" style="background:transparent; border:none; color:#e53e3e; cursor:pointer;" title="Delete">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+        html += `</tbody></table>`;
+        dbTableBody.innerHTML = html;
+      }
+    } catch(e) { console.error("Error loading db", e); }
   };
 
   if(btnClearDb) {
-    btnClearDb.addEventListener('click', () => {
+    btnClearDb.addEventListener('click', async () => {
       if (confirm('Are you sure you want to clear all generated certificates? This cannot be undone.')) {
-        localStorage.removeItem(DB_KEY);
-        renderDatabase();
+        try {
+          const q = query(collection(db, DB_COLLECTION));
+          const querySnapshot = await getDocs(q);
+          const deletePromises = [];
+          querySnapshot.forEach((document) => {
+            deletePromises.push(deleteDoc(doc(db, DB_COLLECTION, document.id)));
+          });
+          await Promise.all(deletePromises);
+          renderDatabase();
+        } catch(e) { console.error(e); }
       }
     });
   }
 
   if(btnExportCsv) {
-    btnExportCsv.addEventListener('click', () => {
-      const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-      if (records.length === 0) {
-        alert('No records to export!');
-        return;
-      }
-      
-      const headers = ['ID', 'Student Name', 'Internship Details', 'Start Date', 'End Date', 'Total Days', 'Cert ID', 'Timestamp'];
-      const csvRows = [headers.join(',')];
-      
-      records.forEach(rec => {
-        const values = [
-          rec.db_id, 
-          `"${rec.student_name}"`, 
-          `"${rec.internship_details}"`, 
-          rec.start_date, 
-          rec.end_date, 
-          rec.total_days, 
-          rec.cert_id,
-          rec.timestamp
-        ];
-        csvRows.push(values.join(','));
-      });
-      
-      const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', 'aroxtech_certificates.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    btnExportCsv.addEventListener('click', async () => {
+      try {
+        const q = query(collection(db, DB_COLLECTION));
+        const querySnapshot = await getDocs(q);
+        const records = [];
+        querySnapshot.forEach((doc) => records.push({ id: doc.id, ...doc.data() }));
+
+        if (records.length === 0) {
+          alert('No records to export!');
+          return;
+        }
+        
+        const headers = ['ID', 'Student Name', 'Internship Details', 'Start Date', 'End Date', 'Total Days', 'Cert ID', 'Timestamp'];
+        const csvRows = [headers.join(',')];
+        
+        records.forEach(rec => {
+          const values = [
+            rec.id, 
+            `"${rec.student_name}"`, 
+            `"${rec.internship_details}"`, 
+            rec.start_date, 
+            rec.end_date, 
+            rec.total_days, 
+            rec.cert_id,
+            rec.timestamp
+          ];
+          csvRows.push(values.join(','));
+        });
+        
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', 'aroxtech_certificates.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch(e) { console.error(e); }
     });
   }
+
+  /* ==========================================================================
+     TOGGLE VIEW LOGIC
+     ========================================================================== */
+  const btnGridView = document.getElementById('btnGridView');
+  const btnTableView = document.getElementById('btnTableView');
+  
+  if (btnGridView && btnTableView) {
+    btnGridView.addEventListener('click', () => {
+      currentDbView = 'grid';
+      btnGridView.style.background = '#fff';
+      btnGridView.style.color = 'var(--primary-navy)';
+      btnGridView.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+      btnTableView.style.background = 'transparent';
+      btnTableView.style.color = '#718096';
+      btnTableView.style.boxShadow = 'none';
+      renderDatabase();
+    });
+    btnTableView.addEventListener('click', () => {
+      currentDbView = 'table';
+      btnTableView.style.background = '#fff';
+      btnTableView.style.color = 'var(--primary-navy)';
+      btnTableView.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+      btnGridView.style.background = 'transparent';
+      btnGridView.style.color = '#718096';
+      btnGridView.style.boxShadow = 'none';
+      renderDatabase();
+    });
+  }
+
+  /* ==========================================================================
+     RECORD MODAL LOGIC
+     ========================================================================== */
+  const recordModal = document.getElementById('recordModal');
+  const btnCloseModal = document.getElementById('btnCloseModal');
+  const modalPreviewContainer = document.getElementById('modalPreviewContainer');
+  const exportWrapper = document.getElementById('exportWrapper');
+  
+  window.viewRecordModal = async (id) => {
+    try {
+      // Fetch data
+      const q = query(collection(db, DB_COLLECTION));
+      const querySnapshot = await getDocs(q);
+      let rec = null;
+      querySnapshot.forEach(doc => {
+        if (doc.data().db_id === id.toString() || doc.id === id.toString()) rec = doc.data();
+      });
+      if (!rec) return;
+
+      // Populate text fields
+      document.getElementById('modalCertId').textContent = rec.cert_id;
+      document.getElementById('modalName').textContent = rec.student_name;
+      document.getElementById('modalCourse').textContent = rec.internship_details;
+      document.getElementById('modalDuration').textContent = rec.total_days;
+      
+      const startObj = new Date(rec.start_date);
+      const endObj = new Date(rec.end_date);
+      const formatOpts = { day: '2-digit', month: 'long', year: 'numeric' };
+      document.getElementById('modalStart').textContent = !isNaN(startObj) ? startObj.toLocaleDateString('en-GB', formatOpts) : rec.start_date;
+      document.getElementById('modalEnd').textContent = !isNaN(endObj) ? endObj.toLocaleDateString('en-GB', formatOpts) : rec.end_date;
+
+      // Open Modal
+      recordModal.style.display = 'flex';
+      modalPreviewContainer.innerHTML = `<div style="color: #a0aec0; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        <svg class="spinner" viewBox="0 0 50 50" style="width: 30px; height: 30px; animation: spin 1s linear infinite;"><circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="5" stroke-dasharray="31.4 31.4" stroke-linecap="round"></circle></svg>
+        Generating Preview...
+      </div>`;
+
+      // Silently inject this record into the main editor to update the DOM
+      await window.editRecord(id);
+      
+      // Give DOM time to reflow text
+      setTimeout(async () => {
+        try {
+          const canvas = await window.html2canvas(exportWrapper, {
+            scale: 1, // smaller scale for fast preview
+            useCORS: true,
+            logging: false,
+            backgroundColor: null
+          });
+          const imgUrl = canvas.toDataURL('image/png');
+          modalPreviewContainer.innerHTML = `<img src="${imgUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 4px;">`;
+        } catch(e) {
+          console.error("Preview Generation Error:", e);
+          modalPreviewContainer.innerHTML = `<div style="color:#e53e3e;">Failed to generate preview.</div>`;
+        }
+      }, 300);
+
+      // Setup Export Buttons
+      document.getElementById('modalBtnPdf').onclick = () => btnDownloadPdf.click();
+      document.getElementById('modalBtnPng').onclick = () => btnDownloadPng.click();
+      document.getElementById('modalBtnPrint').onclick = () => window.print();
+
+    } catch(e) { console.error(e); }
+  };
+
+  if (btnCloseModal) {
+    btnCloseModal.addEventListener('click', () => {
+      recordModal.style.display = 'none';
+    });
+  }
+  
+  // Close modal when clicking outside
+  window.addEventListener('click', (e) => {
+    if (e.target === recordModal) {
+      recordModal.style.display = 'none';
+    }
+  });
 
   // Initialize Right Panel view
   renderDatabase();
@@ -818,3 +1012,4 @@ document.addEventListener('DOMContentLoaded', () => {
   advanceCertId();
 
 });
+

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arox-certs-v2';
+const CACHE_NAME = 'arox-cert-v3';
 const urlsToCache = [
   './',
   './index.html',
