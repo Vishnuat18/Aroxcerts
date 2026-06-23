@@ -171,6 +171,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewCertId) viewCertId.textContent = certIdText;
         if (viewVerifyUrl) viewVerifyUrl.textContent = `aroxtech.com/verify?id=${certIdText}`;
 
+        // Render unique QR code
+        const qrcodeContainer = document.getElementById('qrcode');
+        if (qrcodeContainer) {
+          qrcodeContainer.innerHTML = '';
+          const verifyUrl = `https://aroxtech.com/verify.html?id=${certIdText}`;
+          new QRCode(qrcodeContainer, {
+            text: verifyUrl,
+            width: 70,
+            height: 70,
+            colorDark: "#082A66",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+          });
+        }
+
         // Show Success Step (user must click next from here)
         activateStep(3);
       } else {

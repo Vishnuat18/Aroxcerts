@@ -215,8 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const updateQRCode = (url) => {
     if (!qrcodeContainer) return;
     qrcodeContainer.innerHTML = ''; // clear old QR
-    /*
-    // QR Code rendering temporarily disabled at user request
+    
+    // QR Code rendering enabled
     if (!url || url === '[Verification URL]' || url === 'https://[Verification URL]') return;
     
     qrCodeInstance = new QRCode(qrcodeContainer, {
@@ -227,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
       colorLight: "#ffffff",
       correctLevel: QRCode.CorrectLevel.H
     });
-    */
   };
 
   inputVerifyUrl.addEventListener('input', (e) => {
@@ -731,6 +730,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!isNaN(endObj)) viewEndDate.textContent = endObj.toLocaleDateString('en-GB', formatOpts);
       viewDuration.textContent = rec.total_days;
       viewCertId.textContent = rec.cert_id;
+      
+      if (inputVerifyUrl) {
+        inputVerifyUrl.value = `https://aroxtech.com/verify.html?id=${rec.cert_id}`;
+        inputVerifyUrl.dispatchEvent(new Event('input'));
+      }
       
       editingDbId = id.toString();
       if (btnAddDbText) btnAddDbText.textContent = "Update Record";
