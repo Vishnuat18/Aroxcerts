@@ -4,9 +4,6 @@
    responsive preview scaling, and pixel-perfect corporate aesthetics.
    ========================================================================== */
 
-/* --- Import Google Fonts --- */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,600&display=swap');
-
 /* --- Design System & CSS Variables --- */
 :root {
   --primary-navy: #081F4D;
@@ -267,27 +264,12 @@ body {
 /* --- Preview Area --- */
 .preview-panel {
   flex: 1;
-  background: #E2E8F0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-  height: 100vh;
-}
-
-.certificate-preview {
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-.certificate-preview img,
-.certificate-preview canvas {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
+  padding: 30px;
+  background-color: var(--bg-preview);
 }
 
 .preview-scroller {
@@ -312,15 +294,11 @@ body {
 }
 
 #export-wrapper {
-  width: 2480px;
-  height: 3508px;
+  width: 794px;
+  height: 1123px;
   position: relative;
   overflow: visible;
-  background:
-    radial-gradient(circle at center,
-      rgba(212, 175, 55, 0.04),
-      transparent 60%),
-    #ffffff;
+  background: #ffffff;
   box-shadow: var(--shadow-premium);
 }
 
@@ -332,8 +310,6 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  transform: scale(3.1234257);
-  transform-origin: top left;
   overflow: visible !important;
   box-sizing: border-box;
   color: var(--primary-navy);
@@ -799,13 +775,13 @@ body {
 .radial-tech-rings .ring-line-h {
   width: 880px;
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(10, 31, 68, 0.04), transparent);
+  background-color: rgba(10, 31, 68, 0.04);
 }
 
 .radial-tech-rings .ring-line-v {
   width: 1px;
   height: 880px;
-  background: linear-gradient(to bottom, transparent, rgba(10, 31, 68, 0.04), transparent);
+  background-color: rgba(10, 31, 68, 0.04);
 }
 
 .radial-tech-rings .crosshair {
@@ -890,8 +866,6 @@ body {
   left: 0;
   width: 794px;
   height: 1123px;
-  transform: scale(3.1234257);
-  transform-origin: top left;
   pointer-events: none;
   z-index: 1;
 }
@@ -1089,38 +1063,83 @@ body {
    ========================================================================== */
 .cert-banner-wrapper {
   position: relative;
-  width: 90%;
-  max-width: 640px;
-  height: 52px;
-  margin-bottom: 16px;
-}
-
-/* Outer Gold clip path layer */
-.cert-banner-gold {
-  position: absolute;
-  inset: 0;
-  background-color: var(--primary-gold);
-  clip-path: polygon(2.5% 0, 97.5% 0, 100% 50%, 97.5% 100%, 2.5% 100%, 0 50%);
-}
-
-/* Inner Navy clip path layer */
-.cert-banner-navy {
-  position: absolute;
-  inset: 2px;
+  width: 570px;
+  height: 70px;
+  /* Fixed height for exact geometric calculation */
   background-color: var(--secondary-navy);
-  clip-path: polygon(2.5% 0, 97.5% 0, 100% 50%, 97.5% 100%, 2.5% 100%, 0 50%);
+  border-top: 2px solid var(--primary-gold);
+  border-bottom: 2px solid var(--primary-gold);
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 auto 16px auto;
+  box-sizing: border-box;
+  transform: none !important;
+  text-rendering: optimizeLegibility;
+  z-index: 1;
+}
+
+.cert-banner-wrapper::before,
+.cert-banner-wrapper::after {
+  content: "";
+  position: absolute;
+  width: 49.5px;
+  height: 49.5px;
+  background-color: var(--secondary-navy);
+  top: 8.25px;
+  box-sizing: border-box;
+  z-index: -1;
+}
+
+.cert-banner-wrapper::before {
+  left: -24.75px;
+  border-bottom: 2px solid var(--primary-gold);
+  border-left: 2px solid var(--primary-gold);
+  transform: rotate(45deg);
+}
+
+.cert-banner-wrapper::after {
+  right: -24.75px;
+  border-top: 2px solid var(--primary-gold);
+  border-right: 2px solid var(--primary-gold);
+  transform: rotate(45deg);
+}
+
+/* Hide legacy gold element */
+.cert-banner-gold {
+  display: none !important;
+}
+
+/* Make navy a transparent container since it holds the text */
+.cert-banner-navy {
+  position: relative !important;
+  inset: auto !important;
+  background: transparent !important;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto !important;
 }
 
 .cert-banner-text {
+  position: relative;
+  z-index: 2;
   color: #ffffff;
   font-weight: 700;
   font-size: 19px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: visible;
+  transform: none !important;
+  text-rendering: optimizeLegibility;
 }
 
 /* --- "DURING THE PERIOD FROM" --- */
@@ -1344,6 +1363,14 @@ body {
   margin-bottom: -20px;
 }
 
+.sig-image {
+  width: 130px;
+  height: 130px;
+  object-fit: contain;
+  margin-bottom: -30px;
+  margin-left: 70px;
+}
+
 .sig-line {
   width: 100%;
   height: 1px;
@@ -1396,10 +1423,12 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 100px; /* Fits exactly within 140px-180px requirement */
+  width: 100px;
+  /* Fits exactly within 140px-180px requirement */
   height: 100px;
   z-index: 15;
-  margin-bottom: -20px; /* Offset downwards relative to grid row baseline */
+  margin-bottom: -20px;
+  /* Offset downwards relative to grid row baseline */
 }
 
 .seal-badge-container #qrcode {
@@ -1410,7 +1439,7 @@ body {
   padding: 5px;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1485,17 +1514,18 @@ body {
     overflow-y: auto !important;
     height: auto !important;
   }
-  
+
   #appContainer {
     flex-direction: column !important;
     height: auto !important;
   }
-  
-  .editor-panel {
-  }
+
+  /* .editor-panel {} */
+
   .editor-content {
     overflow-y: visible;
   }
+
   .preview-panel {
     flex: none;
     width: 100%;
@@ -1509,10 +1539,11 @@ body {
    PRINT FRIENDLY MEDIA QUERIES
    ========================================================================== */
 @media print {
+
   html,
   body {
-    width: 210mm;
-    height: 297mm;
+    width: 100%;
+    height: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -1522,25 +1553,21 @@ body {
   .controls,
   .sidebar,
   .toolbar,
-  .buttons,
-  .preview-panel,
-  .preview-scroller {
+  .buttons {
     display: none !important;
   }
 
-  #printCertificate {
-    display: block !important;
+  .preview-panel,
+  .preview-scroller {
     width: 210mm !important;
     height: 297mm !important;
-    margin: 0 !important;
     padding: 0 !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    background: white !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    margin: 0 !important;
     overflow: hidden !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    background: none !important;
   }
 
   @page {
@@ -1586,7 +1613,19 @@ body {
     margin: 0 !important;
     padding: 0 !important;
   }
-}/* ==========================================================================
+
+  .cert-banner-wrapper {
+    height: 70px !important;
+    overflow: visible !important;
+  }
+
+  .cert-banner-text {
+    line-height: 1.4 !important;
+    overflow: visible !important;
+  }
+}
+
+/* ==========================================================================
    DATABASE MODAL STYLES
    ========================================================================== */
 .db-modal-overlay {
@@ -1605,21 +1644,24 @@ body {
   transition: opacity 0.3s ease;
   backdrop-filter: blur(4px);
 }
+
 .db-modal-overlay.active {
   opacity: 1;
   pointer-events: all;
 }
+
 .db-modal-content {
   background: #ffffff;
   width: 90%;
   max-width: 900px;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   max-height: 90vh;
   overflow: hidden;
 }
+
 .db-modal-header {
   padding: 20px;
   background: #0A1F44;
@@ -1628,10 +1670,12 @@ body {
   justify-content: space-between;
   align-items: center;
 }
+
 .db-modal-header h2 {
   font-size: 18px;
   font-weight: 600;
 }
+
 .db-close-btn {
   background: none;
   border: none;
@@ -1639,26 +1683,32 @@ body {
   font-size: 24px;
   cursor: pointer;
 }
+
 .db-modal-body {
   padding: 20px;
   overflow-y: auto;
 }
+
 .db-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
 }
-.db-table th, .db-table td {
+
+.db-table th,
+.db-table td {
   padding: 12px;
   border-bottom: 1px solid #eee;
   font-size: 14px;
   color: #333;
 }
+
 .db-table th {
   background: #f8f9fa;
   font-weight: 600;
   color: #0A1F44;
 }
+
 .db-modal-footer {
   padding: 15px 20px;
   background: #f8f9fa;
@@ -1667,6 +1717,7 @@ body {
   justify-content: flex-end;
   gap: 10px;
 }
+
 /* ==========================================================================
    LOGIN & PROFILE STYLES
    ========================================================================== */
@@ -1683,10 +1734,12 @@ body {
   transition: opacity 0.3s ease;
   backdrop-filter: blur(8px);
 }
+
 .login-overlay.active {
   opacity: 1;
   pointer-events: all;
 }
+
 .login-box {
   background: #ffffff;
   padding: 40px;
@@ -1694,23 +1747,27 @@ body {
   width: 90%;
   max-width: 400px;
   text-align: center;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
+
 .login-logo {
   height: 60px;
   margin-bottom: 20px;
   object-fit: contain;
 }
+
 .login-box h2 {
   color: var(--primary-navy);
   margin-bottom: 10px;
   font-size: 22px;
 }
+
 .login-box p {
   color: var(--text-body);
   margin-bottom: 20px;
   font-size: 14px;
 }
+
 .login-box input {
   width: 100%;
   padding: 12px 15px;
@@ -1719,16 +1776,19 @@ body {
   margin-bottom: 10px;
   font-size: 16px;
 }
+
 .login-box input:focus {
   outline: none;
   border-color: var(--primary-gold);
 }
+
 .login-error {
   color: #ff4d4d;
   font-size: 13px;
   margin-bottom: 15px;
   min-height: 20px;
 }
+
 .profile-icon {
   position: fixed;
   top: 20px;
@@ -1739,16 +1799,18 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   z-index: 1000;
   color: var(--primary-navy);
   font-weight: 600;
   font-size: 14px;
   border: 1px solid rgba(212, 175, 55, 0.3);
 }
+
 .profile-icon svg {
   color: var(--primary-gold);
 }
+
 /* ==========================================================================
    RIGHT PANEL: DATABASE AND EXPORTS
    ========================================================================== */
@@ -1759,7 +1821,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  box-shadow: -4px 0 15px rgba(0,0,0,0.03);
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.03);
   z-index: 10;
   overflow: hidden;
 }
@@ -1796,13 +1858,13 @@ body {
   border-radius: 8px;
   padding: 15px;
   margin-bottom: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .db-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
   border-color: var(--primary-gold);
 }
 
@@ -1840,7 +1902,8 @@ body {
   gap: 8px;
 }
 
-.btn-edit, .btn-delete {
+.btn-edit,
+.btn-delete {
   flex: 1;
   padding: 6px;
   font-size: 11px;
@@ -1860,6 +1923,7 @@ body {
   color: var(--primary-navy);
   border-color: #cbd5e0;
 }
+
 .btn-edit:hover {
   background: #e2e8f0;
 }
@@ -1869,12 +1933,11 @@ body {
   color: #e53e3e;
   border-color: #fed7d7;
 }
+
 .btn-delete:hover {
   background: #fed7d7;
 }
 
-  }
-}
 
 /* ==========================================================================
    MOBILE RESPONSIVENESS
@@ -1884,12 +1947,12 @@ body {
     overflow-y: auto !important;
     height: auto !important;
   }
-  
+
   #appContainer {
     flex-direction: column !important;
     height: auto !important;
   }
-  
+
   .editor-panel {
     width: 100% !important;
     min-width: 100% !important;
@@ -1899,326 +1962,499 @@ body {
     border-bottom: 3px solid var(--primary-gold);
     z-index: 20;
   }
-  
+
   .dynamic-right-panel {
     width: 100% !important;
     height: 80vh !important;
     min-height: 500px;
   }
-  
+
   /* Database panel width fix */
   .database-panel {
     width: 100% !important;
   }
-  
+
   /* Floating buttons */
   .cert-export-footer {
     bottom: 15px !important;
     right: 15px !important;
     gap: 10px !important;
   }
+
   .icon-action-btn {
     width: 45px !important;
-  color: #ff4d4d;
-  font-size: 13px;
-  margin-bottom: 15px;
-  min-height: 20px;
-}
-.profile-icon {
-  position: fixed;
-  top: 20px;
-  right: 30px;
-  background: #ffffff;
-  padding: 8px 16px;
-  border-radius: 30px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-  z-index: 1000;
-  color: var(--primary-navy);
-  font-weight: 600;
-  font-size: 14px;
-  border: 1px solid rgba(212, 175, 55, 0.3);
-}
-.profile-icon svg {
-  color: var(--primary-gold);
-}
-/* ==========================================================================
+    color: #ff4d4d;
+    font-size: 13px;
+    margin-bottom: 15px;
+    min-height: 20px;
+  }
+
+  .profile-icon {
+    position: fixed;
+    top: 20px;
+    right: 30px;
+    background: #ffffff;
+    padding: 8px 16px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    color: var(--primary-navy);
+    font-weight: 600;
+    font-size: 14px;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+  }
+
+  .profile-icon svg {
+    color: var(--primary-gold);
+  }
+
+  /* ==========================================================================
    RIGHT PANEL: DATABASE AND EXPORTS
    ========================================================================== */
-.database-panel {
-  width: 340px;
-  background-color: #ffffff;
-  border-left: 1px solid #E2E8F0;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  box-shadow: -4px 0 15px rgba(0,0,0,0.03);
-  z-index: 10;
-  overflow: hidden;
-}
+  .database-panel {
+    width: 340px;
+    background-color: #ffffff;
+    border-left: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.03);
+    z-index: 10;
+    overflow: hidden;
+  }
 
-.db-panel-header {
-  padding: 25px;
-  border-bottom: 1px solid #E2E8F0;
-  background: var(--bg-light);
-}
+  .db-panel-header {
+    padding: 25px;
+    border-bottom: 1px solid #E2E8F0;
+    background: var(--bg-light);
+  }
 
-.db-panel-header h2 {
-  font-family: var(--font-sans);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--primary-navy);
-  margin-bottom: 5px;
-}
+  .db-panel-header h2 {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary-navy);
+    margin-bottom: 5px;
+  }
 
-.db-panel-header p {
-  font-size: 12px;
-  color: #718096;
-}
+  .db-panel-header p {
+    font-size: 12px;
+    color: #718096;
+  }
 
-.db-panel-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 15px;
-  background: #f8fafc;
-}
+  .db-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    background: #f8fafc;
+  }
 
-.db-item {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
+  .db-item {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
 
-.db-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-  border-color: var(--primary-gold);
-}
+  .db-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    border-color: var(--primary-gold);
+  }
 
-.db-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
+  .db-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
 
-.db-item-id {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--primary-gold);
-  background: rgba(212, 175, 55, 0.1);
-  padding: 3px 8px;
-  border-radius: 12px;
-}
+  .db-item-id {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary-gold);
+    background: rgba(212, 175, 55, 0.1);
+    padding: 3px 8px;
+    border-radius: 12px;
+  }
 
-.db-item-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--primary-navy);
-  margin-bottom: 4px;
-}
+  .db-item-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary-navy);
+    margin-bottom: 4px;
+  }
 
-.db-item-course {
-  font-size: 12px;
-  color: #4a5568;
-  margin-bottom: 10px;
-}
+  .db-item-course {
+    font-size: 12px;
+    color: #4a5568;
+    margin-bottom: 10px;
+  }
 
-.db-item-actions {
-  display: flex;
-  gap: 8px;
-}
+  .db-item-actions {
+    display: flex;
+    gap: 8px;
+  }
 
-.btn-edit, .btn-delete {
-  flex: 1;
-  padding: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  transition: all 0.2s;
-}
+  .btn-edit,
+  .btn-delete {
+    flex: 1;
+    padding: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.2s;
+  }
 
-.btn-edit {
-  background: var(--bg-light);
-  color: var(--primary-navy);
-  border-color: #cbd5e0;
-}
-.btn-edit:hover {
-  background: #e2e8f0;
-}
+  .btn-edit {
+    background: var(--bg-light);
+    color: var(--primary-navy);
+    border-color: #cbd5e0;
+  }
 
-.btn-delete {
-  background: #fff5f5;
-  color: #e53e3e;
-  border-color: #fed7d7;
-}
-.btn-delete:hover {
-  background: #fed7d7;
-}
+  .btn-edit:hover {
+    background: #e2e8f0;
+  }
 
-.db-panel-footer {
-  padding: 20px;
-  background: #ffffff;
-  border-top: 1px solid #E2E8F0;
-}
+  .btn-delete {
+    background: #fff5f5;
+    color: #e53e3e;
+    border-color: #fed7d7;
+  }
 
-/* ==========================================================================
+  .btn-delete:hover {
+    background: #fed7d7;
+  }
+
+  .db-panel-footer {
+    padding: 20px;
+    background: #ffffff;
+    border-top: 1px solid #E2E8F0;
+  }
+
+  /* ==========================================================================
    DYNAMIC CERTIFICATE TEMPLATES
    ========================================================================== */
 
-/* 1. CLASSIC CORPORATE (Default) */
-.certificate.template-classic {
-  /* Inherits current default variables */
-}
+  /* 1. CLASSIC CORPORATE (Default)
+  .certificate.template-classic {
+    /* Inherits current default variables
+  } */
 
-/* 2. MODERN MINIMALIST */
-.certificate.template-minimalist {
-  --primary-navy: #1A202C;
-  --secondary-navy: #2D3748;
-  --primary-gold: #CBD5E0;
-  --bg-color: #FFFFFF;
-  --font-serif: 'Inter', sans-serif;
-  --font-sans: 'Inter', sans-serif;
-}
-.certificate.template-minimalist .cert-border {
-  border: 1px solid #E2E8F0;
-  box-shadow: none;
-}
-.certificate.template-minimalist .corner-ribbon, 
-.certificate.template-minimalist .bg-pattern-dots {
-  display: none !important;
-}
-.certificate.template-minimalist .cert-title { font-weight: 900; letter-spacing: 0.1em; }
-.certificate.template-minimalist .cert-id-badge { background: #EDF2F7; color: #1A202C; box-shadow: none; }
+  /* 2. MODERN MINIMALIST */
+  .certificate.template-minimalist {
+    --primary-navy: #1A202C;
+    --secondary-navy: #2D3748;
+    --primary-gold: #CBD5E0;
+    --bg-color: #FFFFFF;
+    --font-serif: 'Inter', sans-serif;
+    --font-sans: 'Inter', sans-serif;
+  }
 
-/* 3. TECH GEOMETRIC */
-.certificate.template-geometric {
-  --primary-navy: #000000;
-  --secondary-navy: #111111;
-  --primary-gold: #3182CE;
-  --bg-color: #FAFAFA;
-}
-.certificate.template-geometric .cert-border {
-  border: 4px solid #3182CE;
-  border-radius: 0;
-}
-.certificate.template-geometric .corner-ribbon {
-  clip-path: polygon(0 0, 100% 0, 100% 100%);
-  background: linear-gradient(135deg, #3182CE, #2B6CB0);
-}
-.certificate.template-geometric .bg-pattern-dots {
-  background-image: linear-gradient(#E2E8F0 1px, transparent 1px), linear-gradient(90deg, #E2E8F0 1px, transparent 1px);
-  background-size: 40px 40px;
-  opacity: 0.5;
-}
+  .certificate.template-minimalist .cert-border {
+    border: 1px solid #E2E8F0;
+    box-shadow: none;
+  }
 
-/* 4. ELEGANT SERIF */
-.certificate.template-elegant {
-  --primary-navy: #2C3E50;
-  --secondary-navy: #34495E;
-  --primary-gold: #D4AF37;
-  --bg-color: #FDFAEF;
-  --font-serif: 'Playfair Display', serif;
-}
-.certificate.template-elegant .cert-border {
-  border: double 8px var(--primary-gold);
-  border-radius: 15px;
-}
-.certificate.template-elegant .cert-title { font-style: italic; }
+  .certificate.template-minimalist .corner-ribbon,
+  .certificate.template-minimalist .bg-pattern-dots {
+    display: none !important;
+  }
 
-/* 5. INNOVATION CIRCUIT */
-.certificate.template-circuit {
-  --primary-navy: #00FF41;
-  --secondary-navy: #008F11;
-  --primary-gold: #00FF41;
-  --bg-color: #0D0D0D;
-}
-.certificate.template-circuit .cert-header, 
-.certificate.template-circuit .cert-description, 
-.certificate.template-circuit .info-value, 
-.certificate.template-circuit .sig-title {
-  color: #E2E8F0 !important;
-}
-.certificate.template-circuit .cert-border {
-  border: 2px solid #00FF41;
-  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
-}
-.certificate.template-circuit .date-pill { background: #111; border-color: #00FF41; color: #00FF41; }
-.certificate.template-circuit .date-pill span { color: #00FF41; }
-.certificate.template-circuit .to-hexagon { background: #008F11; color: #fff; border-color: #00FF41; }
-.certificate.template-circuit .info-divider-left, .certificate.template-circuit .info-divider-right, .certificate.template-circuit .sig-line { background: #00FF41; opacity: 1; }
-.certificate.template-circuit .icon-gold-border { background: #000; border-color: #00FF41; color: #00FF41; }
+  .certificate.template-minimalist .cert-title {
+    font-weight: 900;
+    letter-spacing: 0.1em;
+  }
 
-/* ==========================================================================
+  .certificate.template-minimalist .cert-id-badge {
+    background: #EDF2F7;
+    color: #1A202C;
+    box-shadow: none;
+  }
+
+  /* 3. TECH GEOMETRIC */
+  .certificate.template-geometric {
+    --primary-navy: #000000;
+    --secondary-navy: #111111;
+    --primary-gold: #3182CE;
+    --bg-color: #FAFAFA;
+  }
+
+  .certificate.template-geometric .cert-border {
+    border: 4px solid #3182CE;
+    border-radius: 0;
+  }
+
+  .certificate.template-geometric .corner-ribbon {
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+    background: linear-gradient(135deg, #3182CE, #2B6CB0);
+  }
+
+  .certificate.template-geometric .bg-pattern-dots {
+    background-image: linear-gradient(#E2E8F0 1px, transparent 1px), linear-gradient(90deg, #E2E8F0 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.5;
+  }
+
+  /* 4. ELEGANT SERIF */
+  .certificate.template-elegant {
+    --primary-navy: #2C3E50;
+    --secondary-navy: #34495E;
+    --primary-gold: #D4AF37;
+    --bg-color: #FDFAEF;
+    --font-serif: 'Playfair Display', serif;
+  }
+
+  .certificate.template-elegant .cert-border {
+    border: double 8px var(--primary-gold);
+    border-radius: 15px;
+  }
+
+  .certificate.template-elegant .cert-title {
+    font-style: italic;
+  }
+
+  /* 5. INNOVATION CIRCUIT */
+  .certificate.template-circuit {
+    --primary-navy: #00FF41;
+    --secondary-navy: #008F11;
+    --primary-gold: #00FF41;
+    --bg-color: #0D0D0D;
+  }
+
+  .certificate.template-circuit .cert-header,
+  .certificate.template-circuit .cert-description,
+  .certificate.template-circuit .info-value,
+  .certificate.template-circuit .sig-title {
+    color: #E2E8F0 !important;
+  }
+
+  .certificate.template-circuit .cert-border {
+    border: 2px solid #00FF41;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+  }
+
+  .certificate.template-circuit .date-pill {
+    background: #111;
+    border-color: #00FF41;
+    color: #00FF41;
+  }
+
+  .certificate.template-circuit .date-pill span {
+    color: #00FF41;
+  }
+
+  .certificate.template-circuit .to-hexagon {
+    background: #008F11;
+    color: #fff;
+    border-color: #00FF41;
+  }
+
+  .certificate.template-circuit .info-divider-left,
+  .certificate.template-circuit .info-divider-right,
+  .certificate.template-circuit .sig-line {
+    background: #00FF41;
+    opacity: 1;
+  }
+
+  .certificate.template-circuit .icon-gold-border {
+    background: #000;
+    border-color: #00FF41;
+    color: #00FF41;
+  }
+
+  /* ==========================================================================
    PRINT LAYOUT
    ========================================================================== */
-@media print {
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
+  @media print {
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
   }
-}
 
-/* ==========================================================================
+  /* ==========================================================================
    MOBILE RESPONSIVENESS
    ========================================================================== */
-@media (max-width: 950px) {
-  body {
-    overflow-y: auto !important;
-    height: auto !important;
+  @media (max-width: 950px) {
+    body {
+      overflow-y: auto !important;
+      height: auto !important;
+    }
+
+    #appContainer {
+      flex-direction: column !important;
+      height: auto !important;
+    }
+
+    .editor-panel {
+      width: 100% !important;
+      min-width: 100% !important;
+      height: auto !important;
+      min-height: 60vh;
+      border-right: none;
+      border-bottom: 3px solid var(--primary-gold);
+      z-index: 20;
+    }
+
+    .dynamic-right-panel {
+      width: 100% !important;
+      height: 80vh !important;
+      min-height: 500px;
+    }
+
+    /* Database panel width fix */
+    .database-panel {
+      width: 100% !important;
+    }
+
+    /* Floating buttons */
+    .cert-export-footer {
+      bottom: 15px !important;
+      right: 15px !important;
+      gap: 10px !important;
+    }
+
+    .icon-action-btn {
+      width: 45px !important;
+      height: 45px !important;
+    }
+
+    .icon-action-btn svg {
+      width: 18px !important;
+      height: 18px !important;
+    }
   }
-  
-  #appContainer {
-    flex-direction: column !important;
-    height: auto !important;
+
+  /* ==========================================================================
+   FINAL CERTIFICATE RENDER LOCKS
+   These overrides are intentionally last: preview, export, and print must all
+   preserve the same fixed A4 render tree.
+   ========================================================================== */
+  #certScaleWrapper {
+    width: 2480px !important;
+    height: 3508px !important;
+    transform-origin: top left !important;
+    flex: 0 0 auto;
   }
-  
-  .editor-panel {
-    width: 100% !important;
-    min-width: 100% !important;
-    height: auto !important;
-    min-height: 60vh;
-    border-right: none;
-    border-bottom: 3px solid var(--primary-gold);
-    z-index: 20;
+
+  #export-wrapper {
+    width: 2480px !important;
+    height: 3508px !important;
+    min-width: 2480px !important;
+    min-height: 3508px !important;
+    max-width: 2480px !important;
+    max-height: 3508px !important;
+    overflow: hidden !important;
+    contain: layout paint style;
+    background-color: #ffffff;
   }
-  
-  .dynamic-right-panel {
-    width: 100% !important;
-    height: 80vh !important;
-    min-height: 500px;
+
+  #export-wrapper .cert-container,
+  #export-wrapper .decorative-elements {
+    width: 794px !important;
+    height: 1123px !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: scale(3.1234257) !important;
+    transform-origin: top left !important;
+    max-width: none !important;
+    max-height: none !important;
   }
-  
-  /* Database panel width fix */
-  .database-panel {
-    width: 100% !important;
+
+  #export-wrapper .cert-container {
+    overflow: visible !important;
   }
-  
-  /* Floating buttons */
-  .cert-export-footer {
-    bottom: 15px !important;
-    right: 15px !important;
-    gap: 10px !important;
+
+  .cert-content {
+    width: 794px;
+    height: 1123px;
+    flex: none;
   }
-  .icon-action-btn {
-    width: 45px !important;
-    height: 45px !important;
+
+  .cert-description {
+    white-space: pre-line;
   }
-  .icon-action-btn svg {
-    width: 18px !important;
-    height: 18px !important;
+
+  .seal-badge-container #qrcode canvas,
+  .seal-badge-container #qrcode img {
+    width: 70px !important;
+    height: 70px !important;
+    display: block !important;
+  }
+
+  .icon-action-btn:disabled {
+    opacity: 0.55;
+    cursor: progress;
+    transform: none !important;
+  }
+
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    html,
+    body {
+      width: 210mm !important;
+      height: 297mm !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      background: #ffffff !important;
+    }
+
+    body * {
+      visibility: hidden !important;
+    }
+
+    #export-wrapper,
+    #export-wrapper * {
+      visibility: visible !important;
+    }
+
+    #export-wrapper {
+      position: fixed !important;
+      inset: 0 auto auto 0 !important;
+      width: 2480px !important;
+      height: 3508px !important;
+      min-width: 2480px !important;
+      min-height: 3508px !important;
+      max-width: 2480px !important;
+      max-height: 3508px !important;
+      transform: scale(0.0846774194) !important;
+      transform-origin: top left !important;
+      box-shadow: none !important;
+    }
+
+    #certScaleWrapper {
+      transform: none !important;
+      position: fixed !important;
+      inset: 0 auto auto 0 !important;
+      width: 2480px !important;
+      height: 3508px !important;
+    }
+
+    .editor-panel,
+    .database-panel,
+    .cert-export-footer,
+    .record-modal-content {
+      display: none !important;
+    }
   }
 }

@@ -1,228 +1,166 @@
 /* ==========================================================================
    Certificate Generator Business Logic
-   Implements live bindings, custom inputs, native date formatting,
-   form validation alerts, scale previewing, and PDF/PNG exports.
+   Locks preview, PNG, PDF, and print to one fixed A4 render source.
    ========================================================================== */
 
-import { collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  where,
+  limit
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase-config.js";
 
-const DB_COLLECTION = 'aroxtech_certificates';
+const DB_COLLECTION = "aroxtech_certificates";
+const NATIVE_WIDTH = 794;
+const NATIVE_HEIGHT = 1123;
+const CERT_ID_PATTERN = /^AT\/INT\/(20\d{2})\/(\d{4,})$/;
+const DEFAULT_DESCRIPTION = "During this internship, he/she was found to be dedicated,\nenthusiastic and hardworking.\nWe wish him/her all the best for future endeavors.";
 
-import { auth } from "./firebase-config.js";
+const escapeHtml = (value = "") => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "\"": "&quot;",
+  "'": "&#39;"
+}[char]));
 
-document.addEventListener('DOMContentLoaded', () => {
+const normalizeText = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+const normalizeCertificateId = (value) => normalizeText(value).toUpperCase();
+const getCertificateDocId = (certId) => encodeURIComponent(normalizeCertificateId(certId));
 
+const toTitleCase = (str) => normalizeText(str).toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
-  // --- HTML Elements Cache ---
-  const scaleWrapper = document.getElementById('certScaleWrapper');
-  const certificate = document.getElementById('certificate');
-  const previewPanel = document.querySelector('.preview-panel');
-  
-  const inputName = document.getElementById('inputName');
-  const viewName = document.getElementById('viewName');
-  
-  const selectCourse = document.getElementById('selectCourse');
-  const inputCourse = document.getElementById('inputCourse');
-  const viewCourse = document.getElementById('viewCourse');
-  
-  const inputStartDate = document.getElementById('inputStartDate');
-  const viewStartDate = document.getElementById('viewStartDate');
-  
-  const inputEndDate = document.getElementById('inputEndDate');
-  const viewEndDate = document.getElementById('viewEndDate');
-  
-  const inputDuration = document.getElementById('inputDuration');
-  const viewDuration = document.getElementById('viewDuration');
-  
-  const selectDomain = document.getElementById('selectDomain');
-  const inputDomain = document.getElementById('inputDomain');
-  const viewDomain = document.getElementById('viewDomain');
-  
-  const inputIssueDate = document.getElementById('inputIssueDate');
-  const viewIssueDate = document.getElementById('viewIssueDate');
-  
-  const inputCertId = document.getElementById('inputCertId');
-  const viewCertId = document.getElementById('viewCertId');
-  
-  const inputVerifyUrl = document.getElementById('inputVerifyUrl');
-  const viewVerifyUrl = document.getElementById('viewVerifyUrl');
-  
-  const inputDescription = document.getElementById('inputDescription');
-  const viewDescription = document.getElementById('viewDescription');
+const parseDateValue = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
-  const inputCertYear = document.getElementById('inputCertYear');
-  const inputCertNum = document.getElementById('inputCertNum');
+const toDateInputValue = (value) => {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
 
-  const btnGenId = document.getElementById('btnGenId');
-  const btnDownloadPdf = document.getElementById('btnDownloadPdf');
-  const btnDownloadPng = document.getElementById('btnDownloadPng');
-  const btnPrint = document.getElementById('btnPrint');
+const generateVerificationToken = () => {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
 
-  /* ==========================================================================
-     DATE FORMATTING UTILITY
-     Converts native YYYY-MM-DD to DD MONTH YYYY in uppercase format
-     ========================================================================== */
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length !== 3) return dateStr;
-    const year = parts[0];
-    const monthIndex = parseInt(parts[1], 10) - 1;
-    const day = parts[2];
-    
-    const standardMonths = [
-      'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 
-      'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
-    ];
-    
-    const monthName = standardMonths[monthIndex] || '';
-    const formattedDay = day.padStart(2, '0');
-    return `${formattedDay} ${monthName} ${year}`;
-  };
+const buildVerificationUrl = (rawBase, certId) => {
+  const fallback = "https://aroxtech.in/verify.html";
+  const raw = String(rawBase || "").trim();
+  const base = raw ? raw.split("?")[0] : fallback;
+  const safeBase = base.startsWith("http://") || base.startsWith("https://") ? base : `https://${base}`;
+  return `${safeBase}?id=${normalizeCertificateId(certId)}`;
+};
 
-  /* ==========================================================================
-     PREVIEW LIVE SYNCING: Event Listeners & Binding Helpers
-     ========================================================================== */
-  
-  // Direct text inputs syncing helper
-  const syncInput = (inputEl, viewEl, placeholderText, callback = null) => {
-    const updateView = () => {
-      viewEl.textContent = inputEl.value.trim() || placeholderText;
-      if (callback) callback(inputEl.value);
-    };
-    inputEl.addEventListener('input', updateView);
-    updateView(); // Initialize view text on load
-  };
+const safeFilePart = (value, fallback = "certificate") => {
+  const clean = normalizeText(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return clean || fallback;
+};
 
-  // Helper to sync date input values with formatted output
-  const syncDateInput = (inputEl, viewEl, placeholderText, callback = null) => {
-    const updateView = () => {
-      const formatted = formatDate(inputEl.value);
-      viewEl.textContent = formatted || placeholderText;
-      if (callback) callback(inputEl.value);
-    };
-    inputEl.addEventListener('input', updateView);
-    inputEl.addEventListener('change', updateView);
-    updateView(); // Initialize view text on load
-  };
+document.addEventListener("DOMContentLoaded", () => {
+  const scaleWrapper = document.getElementById("certScaleWrapper");
+  const previewPanel = document.querySelector(".preview-panel");
+  const exportWrapper = document.getElementById("export-wrapper");
 
-  // Ensure inputs start completely empty to show placeholders
-  if (!inputName.value) inputName.value = "";
-  if (!selectCourse.value) selectCourse.value = "";
-  if (!inputCourse.value) inputCourse.value = "";
-  if (!inputStartDate.value) inputStartDate.value = "";
-  if (!inputEndDate.value) inputEndDate.value = "";
-  if (!inputDuration.value) inputDuration.value = "";
-  if (!selectDomain.value) selectDomain.value = "";
-  if (!inputDomain.value) inputDomain.value = "";
-  if (!inputIssueDate.value) inputIssueDate.value = "";
-  if (!inputVerifyUrl.value) inputVerifyUrl.value = "";
+  const inputName = document.getElementById("inputName");
+  const viewName = document.getElementById("viewName");
+  const selectCourse = document.getElementById("selectCourse");
+  const inputCourse = document.getElementById("inputCourse");
+  const viewCourse = document.getElementById("viewCourse");
+  const inputStartDate = document.getElementById("inputStartDate");
+  const viewStartDate = document.getElementById("viewStartDate");
+  const inputEndDate = document.getElementById("inputEndDate");
+  const viewEndDate = document.getElementById("viewEndDate");
+  const inputDuration = document.getElementById("inputDuration");
+  const viewDuration = document.getElementById("viewDuration");
+  const selectDomain = document.getElementById("selectDomain");
+  const inputDomain = document.getElementById("inputDomain");
+  const viewDomain = document.getElementById("viewDomain");
+  const inputIssueDate = document.getElementById("inputIssueDate");
+  const viewIssueDate = document.getElementById("viewIssueDate");
+  const inputCertId = document.getElementById("inputCertId");
+  const viewCertId = document.getElementById("viewCertId");
+  const inputVerifyUrl = document.getElementById("inputVerifyUrl");
+  const viewVerifyUrl = document.getElementById("viewVerifyUrl");
+  const inputDescription = document.getElementById("inputDescription");
+  const viewDescription = document.getElementById("viewDescription");
+  const inputCertYear = document.getElementById("inputCertYear");
+  const inputCertNum = document.getElementById("inputCertNum");
 
-  // Handle Certificate ID Multi-part Logic
-  const updateCertId = () => {
-    if (inputCertYear && inputCertNum && inputCertId) {
-      const generatedId = `AT/INT/${inputCertYear.value.trim()}/${inputCertNum.value.trim()}`;
-      inputCertId.value = generatedId;
-      inputCertId.dispatchEvent(new Event('input'));
-      
-      // Auto-update Verification URL to append ?id= based on input base
-      if (inputVerifyUrl) {
-        let baseUrl = inputVerifyUrl.value.split('?id=')[0].trim();
-        if (!baseUrl || baseUrl === 'https://aroxtech.in/verify.html') baseUrl = "aroxtech.in/verify.html";
-        inputVerifyUrl.value = `${baseUrl}?id=${generatedId}`;
-        inputVerifyUrl.dispatchEvent(new Event('input'));
-      }
-    }
-  };
-  if (inputCertYear) inputCertYear.addEventListener('input', updateCertId);
-  if (inputCertNum) inputCertNum.addEventListener('input', updateCertId);
+  const btnGenId = document.getElementById("btnGenId");
+  const btnDownloadPdf = document.getElementById("btnDownloadPdf");
+  const btnDownloadPng = document.getElementById("btnDownloadPng");
+  const btnPrint = document.getElementById("btnPrint");
+  const btnAddDb = document.getElementById("btnAddDb");
+  const btnAddDbText = document.getElementById("btnAddDbText");
+  const btnCancelEdit = document.getElementById("btnCancelEdit");
+  const btnViewDb = document.getElementById("btnViewDb");
+  const btnBackToCert = document.getElementById("btnBackToCert");
+  const btnExportCsv = document.getElementById("btnExportCsv");
+  const btnClearDb = document.getElementById("btnClearDb");
+  const btnGridView = document.getElementById("btnGridView");
+  const btnTableView = document.getElementById("btnTableView");
+  const certPreviewView = document.getElementById("certPreviewView");
+  const dbListView = document.getElementById("dbListView");
+  const dbTableBody = document.getElementById("dbTableBody");
+  const qrcodeContainer = document.getElementById("qrcode");
+  const selectTemplate = document.getElementById("selectTemplate");
+  const certificate = document.getElementById("certificate");
+  const recordModal = document.getElementById("recordModal");
+  const btnCloseModal = document.getElementById("btnCloseModal");
+  const modalPreviewContainer = document.getElementById("modalPreviewContainer");
 
-  // Bind individual inputs to their preview segments with placeholders
-  syncInput(inputName, viewName, '[Candidate Name]');
-  syncInput(inputCourse, viewCourse, '[Internship/Course Title]');
-  syncDateInput(inputStartDate, viewStartDate, '[Start Date]');
-  syncDateInput(inputEndDate, viewEndDate, '[End Date]');
-  syncInput(inputDuration, viewDuration, '[Duration]');
-  syncInput(inputDomain, viewDomain, '[Domain]');
-  syncDateInput(inputIssueDate, viewIssueDate, '[Date of Issue]');
-  syncInput(inputCertId, viewCertId, '[Certificate ID]');
-  
-  if (inputCertYear && inputCertNum) updateCertId(); // Init
-
-  // Handle selects dropdown toggle & sync logic for Course Title
-  const handleCourseChange = () => {
-    if (selectCourse.value === 'other') {
-      inputCourse.style.display = 'block';
-      viewCourse.textContent = inputCourse.value.trim() || '[Internship/Course Title]';
-    } else if (selectCourse.value === '') {
-      inputCourse.style.display = 'none';
-      inputCourse.value = '';
-      viewCourse.textContent = '[Internship/Course Title]';
-    } else {
-      inputCourse.style.display = 'none';
-      inputCourse.value = selectCourse.value;
-      viewCourse.textContent = selectCourse.value;
-    }
-  };
-  selectCourse.addEventListener('change', handleCourseChange);
-  handleCourseChange(); // Trigger on load
-
-  // Handle selects dropdown toggle & sync logic for Domain
-  const handleDomainChange = () => {
-    if (selectDomain.value === 'other') {
-      inputDomain.style.display = 'block';
-      viewDomain.textContent = inputDomain.value.trim() || '[Domain]';
-    } else if (selectDomain.value === '') {
-      inputDomain.style.display = 'none';
-      inputDomain.value = '';
-      viewDomain.textContent = '[Domain]';
-    } else {
-      inputDomain.style.display = 'none';
-      inputDomain.value = selectDomain.value;
-      viewDomain.textContent = selectDomain.value;
-    }
-  };
-  selectDomain.addEventListener('change', handleDomainChange);
-  handleDomainChange(); // Trigger on load
-
-  // Sync description (converting newlines to HTML line breaks)
-  const syncDescription = () => {
-    const defaultText = "During this internship, he/she was found to be dedicated,\nenthusiastic and hardworking.\nWe wish him/her all the best for future endeavors.";
-    const textVal = inputDescription.value.trim() || defaultText;
-    viewDescription.innerHTML = textVal.replace(/\n/g, '<br>');
-  };
-  inputDescription.addEventListener('input', syncDescription);
-  syncDescription(); // Initial sync on load
-
-  // Template Switching Logic
-  const selectTemplate = document.getElementById('selectTemplate');
-  const certificateContainer = document.getElementById('certificate');
-  
-  if (selectTemplate && certificateContainer) {
-    selectTemplate.addEventListener('change', (e) => {
-      // Remove any existing template classes
-      certificateContainer.classList.remove('template-classic', 'template-minimalist', 'template-geometric', 'template-elegant', 'template-circuit');
-      // Add the new one
-      certificateContainer.classList.add(`template-${e.target.value}`);
-    });
-    // Initialize default
-    certificateContainer.classList.add(`template-${selectTemplate.value}`);
+  if (!exportWrapper || !scaleWrapper) {
+    console.error("Certificate render root is missing. Export disabled.");
+    return;
   }
 
-  // Sync verification URL to the preview link and update QR Code
-  let qrCodeInstance = null;
-  const qrcodeContainer = document.getElementById('qrcode');
-  
+  let editingDbId = null;
+  let currentDbView = "grid";
+  let currentVerificationToken = generateVerificationToken();
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const months = [
+      "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+      "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+    ];
+    if (!months[monthIndex]) return dateStr;
+    return `${parts[2].padStart(2, "0")} ${months[monthIndex]} ${parts[0]}`;
+  };
+
+  const getSelectedCourse = () => (
+    selectCourse.value === "other" ? normalizeText(inputCourse.value) : normalizeText(selectCourse.value)
+  );
+
+  const getSelectedDomain = () => (
+    selectDomain.value === "other" ? normalizeText(inputDomain.value) : normalizeText(selectDomain.value)
+  );
+
   const updateQRCode = (url) => {
     if (!qrcodeContainer) return;
-    qrcodeContainer.innerHTML = ''; // clear old QR
-    
-    // QR Code rendering enabled
-    if (!url || url === '[Verification URL]' || url === 'https://[Verification URL]') return;
-    
-    qrCodeInstance = new QRCode(qrcodeContainer, {
-      text: url,
+    qrcodeContainer.innerHTML = "";
+    if (!url || url === "[Verification URL]") return;
+
+    const qrUrl = url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`;
+    new QRCode(qrcodeContainer, {
+      text: qrUrl,
       width: 70,
       height: 70,
       colorDark: "#082A66",
@@ -231,807 +169,860 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  inputVerifyUrl.addEventListener('input', (e) => {
-    const urlVal = e.target.value.trim();
-    // Display exactly what is typed
-    viewVerifyUrl.textContent = urlVal || '[Verification URL]';
-    // Ensure QR code has http/https
-    const qrUrl = urlVal.startsWith('http') ? urlVal : (urlVal ? `https://${urlVal}` : '');
-    updateQRCode(qrUrl);
-  });
-  
-  // Initialize on load
-  const initialUrl = inputVerifyUrl.value.trim();
-  const startUrl = initialUrl ? (initialUrl.startsWith('http') ? initialUrl : `https://${initialUrl}`) : '[Verification URL]';
-  viewVerifyUrl.textContent = startUrl;
-  if (initialUrl) updateQRCode(startUrl);
+  const syncInput = (inputEl, viewEl, placeholderText, transform = (value) => value) => {
+    const updateView = () => {
+      viewEl.textContent = transform(inputEl.value) || placeholderText;
+    };
+    inputEl.addEventListener("input", updateView);
+    updateView();
+  };
 
-  /* ==========================================================================
-     FORM VALIDATION PIPELINE
-     Checks for missing values and pops up alert dialogue to focus missing inputs
-     ========================================================================== */
-  function validateFields() {
-    // Check dropdowns first
-    if (selectCourse.value === '') {
-      alert('Please select an Internship Title!');
-      selectCourse.focus();
+  const syncInputName = (inputEl, viewEl, placeholderText) => {
+    const updateView = () => {
+      viewEl.textContent = toTitleCase(inputEl.value) || placeholderText;
+    };
+    inputEl.addEventListener("input", updateView);
+    updateView();
+  };
+
+  const syncDateInput = (inputEl, viewEl, placeholderText) => {
+    const updateView = () => {
+      viewEl.textContent = formatDate(inputEl.value) || placeholderText;
+    };
+    inputEl.addEventListener("input", updateView);
+    inputEl.addEventListener("change", updateView);
+    updateView();
+  };
+
+  const updateCertId = () => {
+    const year = normalizeText(inputCertYear.value);
+    const sequence = normalizeText(inputCertNum.value);
+    const certId = normalizeCertificateId(`AT/INT/${year}/${sequence}`);
+    inputCertId.value = certId;
+    inputCertId.dispatchEvent(new Event("input"));
+    inputVerifyUrl.value = buildVerificationUrl(inputVerifyUrl.value, certId, currentVerificationToken);
+    inputVerifyUrl.dispatchEvent(new Event("input"));
+  };
+
+  const handleCourseChange = () => {
+    let courseVal = "";
+    if (selectCourse.value === "other") {
+      inputCourse.style.display = "block";
+      const startPos = inputCourse.selectionStart;
+      const endPos = inputCourse.selectionEnd;
+      inputCourse.value = inputCourse.value.toUpperCase();
+      inputCourse.setSelectionRange(startPos, endPos);
+      courseVal = inputCourse.value.trim();
+      viewCourse.textContent = courseVal || "[Internship/Course Title]";
+    } else {
+      inputCourse.style.display = "none";
+      inputCourse.value = selectCourse.value || "";
+      courseVal = selectCourse.value || "";
+      viewCourse.textContent = courseVal || "[Internship/Course Title]";
+    }
+    
+    if (courseVal.includes(" INTERNSHIP")) {
+      const derivedDomain = courseVal.replace(" INTERNSHIP", "").trim();
+      selectDomain.value = "other";
+      inputDomain.style.display = "block";
+      inputDomain.value = derivedDomain;
+      viewDomain.textContent = derivedDomain || "[Domain]";
+    }
+  };
+
+  const handleDomainChange = () => {
+    if (selectDomain.value === "other") {
+      inputDomain.style.display = "block";
+      viewDomain.textContent = inputDomain.value.trim() || "[Domain]";
+      return;
+    }
+    inputDomain.style.display = "none";
+    inputDomain.value = selectDomain.value || "";
+    viewDomain.textContent = selectDomain.value || "[Domain]";
+  };
+
+  const syncDescription = () => {
+    viewDescription.textContent = inputDescription.value.trim() || DEFAULT_DESCRIPTION;
+  };
+
+  const setInputValue = (inputEl, value) => {
+    inputEl.value = value || "";
+    inputEl.dispatchEvent(new Event("input"));
+    inputEl.dispatchEvent(new Event("change"));
+  };
+
+  const buildCurrentRecord = () => {
+    const certId = normalizeCertificateId(inputCertId.value);
+    const token = currentVerificationToken || generateVerificationToken();
+    currentVerificationToken = token;
+    const verificationUrl = buildVerificationUrl(inputVerifyUrl.value, certId, token);
+
+    return {
+      student_name: toTitleCase(inputName.value),
+      internship_details: getSelectedCourse(),
+      domain: getSelectedDomain(),
+      start_date: inputStartDate.value,
+      end_date: inputEndDate.value,
+      total_days: normalizeText(inputDuration.value).toUpperCase(),
+      issue_date: inputIssueDate.value,
+      cert_id: certId,
+      cert_year: inputCertYear.value.trim(),
+      cert_seq: parseInt(inputCertNum.value, 10) || null,
+      appreciation_text: inputDescription.value.trim() || DEFAULT_DESCRIPTION,
+      organization_name: "Arox Tech",
+      verification_token: token,
+      verification_url: verificationUrl,
+      status: "VALID",
+      render_version: "fixed-a4-v2",
+      timestamp: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  };
+
+  const validateFields = () => {
+    const name = normalizeText(inputName.value);
+    const course = getSelectedCourse();
+    const domain = getSelectedDomain();
+    const certId = normalizeCertificateId(inputCertId.value);
+    const startDate = parseDateValue(inputStartDate.value);
+    const endDate = parseDateValue(inputEndDate.value);
+    const issueDate = parseDateValue(inputIssueDate.value);
+
+    if (!name || name.length < 2 || /[<>]/.test(name)) {
+      alert("Please enter a valid candidate name.");
+      inputName.focus();
       return false;
     }
-    if (selectCourse.value === 'other' && !inputCourse.value.trim()) {
-      alert('Please enter a custom Internship Title!');
-      inputCourse.focus();
+    if (!course || /[<>]/.test(course)) {
+      alert("Please select or enter a valid Internship/Course Title.");
+      (selectCourse.value === "other" ? inputCourse : selectCourse).focus();
+      return false;
+    }
+    if (!domain || /[<>]/.test(domain)) {
+      alert("Please select or enter a valid Domain.");
+      (selectDomain.value === "other" ? inputDomain : selectDomain).focus();
+      return false;
+    }
+    if (!startDate || !endDate || !issueDate) {
+      alert("Please enter valid start, end, and issue dates.");
+      return false;
+    }
+    if (endDate < startDate) {
+      alert("End Date cannot be earlier than Start Date.");
+      inputEndDate.focus();
+      return false;
+    }
+    if (issueDate < endDate) {
+      alert("Date of Issue cannot be earlier than the internship End Date.");
+      inputIssueDate.focus();
+      return false;
+    }
+    if (!normalizeText(inputDuration.value)) {
+      alert("Please enter a valid duration.");
+      inputDuration.focus();
+      return false;
+    }
+    if (!CERT_ID_PATTERN.test(certId)) {
+      alert("Certificate ID must follow AT/INT/YYYY/0001 format.");
+      inputCertNum.focus();
+      return false;
+    }
+    if ((inputDescription.value || DEFAULT_DESCRIPTION).length > 700) {
+      alert("Appreciation text is too long for the fixed certificate layout.");
+      inputDescription.focus();
       return false;
     }
 
-    if (selectDomain.value === '') {
-      alert('Please select a Domain!');
-      selectDomain.focus();
+    try {
+      buildVerificationUrl(inputVerifyUrl.value, certId, currentVerificationToken);
+    } catch (error) {
+      alert("Please enter a valid verification URL.");
+      inputVerifyUrl.focus();
       return false;
-    }
-    if (selectDomain.value === 'other' && !inputDomain.value.trim()) {
-      alert('Please enter a custom Domain!');
-      inputDomain.focus();
-      return false;
-    }
-
-    const requiredFields = [
-      { input: inputName, name: 'Candidate Name' },
-      { input: inputDuration, name: 'Duration' },
-      { input: inputStartDate, name: 'Start Date' },
-      { input: inputEndDate, name: 'End Date' },
-      { input: inputIssueDate, name: 'Date of Issue' },
-      { input: inputCertId, name: 'Certificate ID' },
-      { input: inputVerifyUrl, name: 'Verification URL' }
-    ];
-
-    for (const field of requiredFields) {
-      if (!field.input.value.trim()) {
-        alert(`Please enter a valid ${field.name}!`);
-        field.input.focus();
-        return false;
-      }
     }
 
     return true;
-  }
-
-  /* ==========================================================================
-     AUTO-GENERATE UNIQUE CERTIFICATE ID
-     ========================================================================== */
-  const advanceCertId = () => {
-    const DB_KEY = 'aroxtech_certificates';
-    const records = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
-    const year = inputCertYear ? (inputCertYear.value.trim() || '2026') : '2026';
-    let nextNum = 101;
-    
-    const prefix = `AT/INT/${year}/`;
-    const yearRecords = records.filter(r => r.cert_id && r.cert_id.startsWith(prefix));
-    
-    if (yearRecords.length > 0) {
-      const highestNum = yearRecords.reduce((max, r) => {
-        const seqStr = r.cert_id.split('/').pop();
-        const seqNum = parseInt(seqStr, 10);
-        return (!isNaN(seqNum) && seqNum > max) ? seqNum : max;
-      }, 0);
-      if (highestNum >= 101) nextNum = highestNum + 1;
-    }
-    
-    const autoNum = String(nextNum).padStart(4, '0');
-    if (inputCertNum) {
-      inputCertNum.value = autoNum;
-      inputCertNum.dispatchEvent(new Event('input')); // trigger updateCertId
-    } else if (inputCertId) {
-      inputCertId.value = `${prefix}${autoNum}`;
-      inputCertId.dispatchEvent(new Event('input'));
-    }
   };
 
-  btnGenId.addEventListener('click', advanceCertId);
+  const calculateDuration = () => {
+    const start = parseDateValue(inputStartDate.value);
+    const end = parseDateValue(inputEndDate.value);
+    if (!start || !end || end < start) return;
 
-  /* ==========================================================================
-     RESPONSIVE SCALE PREVIEW PIPELINE
-     ========================================================================== */
-  function adjustPreviewScale() {
+    const diffDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    const duration = `${diffDays} DAYS`;
+    inputDuration.value = duration;
+    viewDuration.textContent = duration;
+  };
+
+  const adjustPreviewScale = () => {
     if (!previewPanel || !scaleWrapper) return;
-    
-    const margin = 60; // Clean spacing around scaled content
-    const availableWidth = previewPanel.clientWidth - margin;
-    const availableHeight = previewPanel.clientHeight - margin;
-    
-    // Certificate container dimensions
-    const exportWrapper = document.getElementById('export-wrapper');
-    const certWidth = exportWrapper ? exportWrapper.offsetWidth : 2480;
-    const certHeight = exportWrapper ? exportWrapper.offsetHeight : 3508;
-    const widthScale = availableWidth / certWidth;
-    const heightScale = availableHeight / certHeight;
-    
-    // Limit maximum scale factor to 1.0 to keep it sharp
-    const scaleFactor = Math.min(widthScale, heightScale, 1.0);
-    
+    const margin = window.innerWidth <= 950 ? 30 : 60;
+    const availableWidth = Math.max(previewPanel.clientWidth - margin, 1);
+    const availableHeight = Math.max(previewPanel.clientHeight - margin, 1);
+    const scaleFactor = Math.min(availableWidth / NATIVE_WIDTH, availableHeight / NATIVE_HEIGHT, 1);
+
     scaleWrapper.style.transform = `scale(${scaleFactor})`;
 
-    // Fit preview scroller size to scaled boundary
     const scroller = scaleWrapper.parentElement;
     if (scroller) {
-      scroller.style.width = `${certWidth * scaleFactor}px`;
-      scroller.style.height = `${certHeight * scaleFactor}px`;
+      scroller.style.width = `${NATIVE_WIDTH * scaleFactor}px`;
+      scroller.style.height = `${NATIVE_HEIGHT * scaleFactor}px`;
     }
-  }
+  };
 
-  // Adjust preview scaling on load and resize
-  window.addEventListener('resize', adjustPreviewScale);
-  adjustPreviewScale();
-  // Double-check scale immediately after layout
-  setTimeout(adjustPreviewScale, 100);
+  const waitForRenderAssets = async (root) => {
+    if (document.fonts) await document.fonts.ready;
 
-  /* ==========================================================================
-     EXPORT LOGIC: PDF & PNG (HIGH FIDELITY)
-     ========================================================================== */
+    const images = Array.from(root.querySelectorAll("img"));
+    await Promise.all(images.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = () => {
+          console.warn("Certificate asset failed to load:", img.getAttribute("src"));
+          resolve();
+        };
+      });
+    }));
 
-  // Utility to handle temporary scaling resets during high-density capture
-  function prepareCapture(callback) {
-    const exportWrapper = document.getElementById('export-wrapper');
-    const originalTransform = scaleWrapper.style.transform;
-    const originalShadow = exportWrapper ? exportWrapper.style.boxShadow : '';
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  };
+
+  const prepareExportRender = () => {
     const scroller = scaleWrapper.parentElement;
-    const originalScrollerWidth = scroller ? scroller.style.width : '';
-    const originalScrollerHeight = scroller ? scroller.style.height : '';
-    
-    // 1. We no longer manipulate the live DOM for capture. 
-    // We clone it to a hidden print container.
-    let printContainer = document.getElementById('printCertificate');
-    if (!printContainer) {
-      printContainer = document.createElement('div');
-      printContainer.id = 'printCertificate';
-      printContainer.style.position = 'absolute';
-      printContainer.style.top = '-9999px';
-      printContainer.style.left = '-9999px';
-      printContainer.style.width = '794px'; // A4 Width at 96 DPI
-      printContainer.style.height = '1123px'; // A4 Height at 96 DPI
-      document.body.appendChild(printContainer);
+    const exportFooter = document.querySelector(".cert-export-footer");
+    const saved = {
+      wrapperTransform: scaleWrapper.style.transform,
+      wrapperTransformOrigin: scaleWrapper.style.transformOrigin,
+      scrollerWidth: scroller ? scroller.style.width : "",
+      scrollerHeight: scroller ? scroller.style.height : "",
+      exportWidth: exportWrapper.style.width,
+      exportHeight: exportWrapper.style.height,
+      exportShadow: exportWrapper.style.boxShadow,
+      exportOverflow: exportWrapper.style.overflow,
+      footerDisplay: exportFooter ? exportFooter.style.display : ""
+    };
+
+    if (exportFooter) exportFooter.style.display = "none";
+    scaleWrapper.style.position = "fixed";
+    scaleWrapper.style.top = "0";
+    scaleWrapper.style.left = "0";
+    scaleWrapper.style.zIndex = "9999";
+    scaleWrapper.style.margin = "0";
+    scaleWrapper.style.transform = "none";
+    scaleWrapper.style.transformOrigin = "top left";
+    exportWrapper.style.width = `${NATIVE_WIDTH}px`;
+    exportWrapper.style.height = `${NATIVE_HEIGHT}px`;
+    exportWrapper.style.overflow = "hidden";
+    exportWrapper.style.boxShadow = "none";
+    if (scroller) {
+      scroller.style.width = `${NATIVE_WIDTH}px`;
+      scroller.style.height = `${NATIVE_HEIGHT}px`;
     }
-    
-    // Clear previous clones
-    printContainer.innerHTML = '';
-    
-    // Clone export-wrapper
-    const originalNode = document.getElementById('export-wrapper');
-    const cloneNode = originalNode.cloneNode(true);
-    
-    // Ensure the clone has no box-shadow to prevent artifacts
-    cloneNode.style.boxShadow = 'none';
-    
-    // Ensure ribbons are within bounds on the clone
-    const ribbons = [
-      { el: cloneNode.querySelector('.corner-ribbon-tl'), type: 'tl' },
-      { el: cloneNode.querySelector('.corner-ribbon-br'), type: 'br' }
-    ];
-    ribbons.forEach(ribbon => {
-      if (ribbon.el) {
-        if (ribbon.type === 'tl') {
-          ribbon.el.style.top = '10px';
-          ribbon.el.style.left = '10px';
-        } else if (ribbon.type === 'br') {
-          ribbon.el.style.bottom = '10px';
-          ribbon.el.style.right = '10px';
-        }
+
+    const ribbon = exportWrapper.querySelector('.cert-banner-wrapper');
+    let savedRibbon = {};
+    if (ribbon) {
+      savedRibbon = {
+        height: ribbon.style.height,
+        paddingTop: ribbon.style.paddingTop,
+        paddingBottom: ribbon.style.paddingBottom
+      };
+      ribbon.style.height = '70px';
+    }
+
+    return () => {
+      scaleWrapper.style.position = "";
+      scaleWrapper.style.top = "";
+      scaleWrapper.style.left = "";
+      scaleWrapper.style.zIndex = "";
+      scaleWrapper.style.margin = "";
+      scaleWrapper.style.transformOrigin = saved.wrapperTransformOrigin;
+      scaleWrapper.style.transform = saved.wrapperTransform;
+      exportWrapper.style.width = saved.exportWidth;
+      exportWrapper.style.height = saved.exportHeight;
+      exportWrapper.style.overflow = saved.exportOverflow;
+      exportWrapper.style.boxShadow = saved.exportShadow;
+      if (scroller) {
+        scroller.style.width = saved.scrollerWidth;
+        scroller.style.height = saved.scrollerHeight;
       }
-    });
-
-    printContainer.appendChild(cloneNode);
-
-    // Hide export buttons from live view temporarily during wait
-    const exportFooter = document.querySelector('.cert-export-footer');
-    if (exportFooter) exportFooter.style.display = 'none';
-
-    // Wait for fonts and images to load in the clone
-    setTimeout(async () => {
-      if (exportFooter) exportFooter.style.display = 'flex';
-      
-      callback(cloneNode, () => {
-        // Cleanup function
-        if (printContainer && printContainer.parentNode) {
-          printContainer.parentNode.removeChild(printContainer);
-        }
-        restoreCertificatePreview();
-      });
-    }, 150);
+      if (ribbon) {
+        ribbon.style.height = savedRibbon.height;
+        ribbon.style.paddingTop = savedRibbon.paddingTop;
+        ribbon.style.paddingBottom = savedRibbon.paddingBottom;
+      }
+      if (exportFooter) exportFooter.style.display = saved.footerDisplay || "flex";
+      adjustPreviewScale();
+    };
   };
 
-  window.restoreCertificatePreview = function() {
-    const certPreview = document.querySelector('.preview-panel') || document.querySelector('.certificate-preview');
-    if (certPreview) {
-      certPreview.style.transform = '';
-      certPreview.style.scale = '';
-      certPreview.style.zoom = '';
-      certPreview.style.width = '';
-      certPreview.style.height = '';
-      certPreview.style.position = '';
-      certPreview.style.top = '';
-      certPreview.style.left = '';
-    }
-    const scaleWrapper = document.getElementById('certScaleWrapper');
-    if (scaleWrapper) {
-      scaleWrapper.style.transformOrigin = 'top center';
-    }
-    if (typeof adjustPreviewScale === 'function') adjustPreviewScale();
-    const exportFooter = document.querySelector('.cert-export-footer');
-    if (exportFooter) exportFooter.style.display = 'flex';
-  };
-
-  // --- PNG Download (HQ) ---
-  btnDownloadPng.addEventListener('click', () => {
-    if (!validateFields()) return;
-    prepareCapture((cloneNode, restoreCallback) => {
-      html2canvas(cloneNode, {
-        scale: 2,
+  const renderCertificateCanvas = async ({ scale = 3 } = {}) => {
+    if (!window.html2canvas) throw new Error("html2canvas library is not loaded.");
+    const restore = prepareExportRender();
+    try {
+      await waitForRenderAssets(exportWrapper);
+      return await html2canvas(exportWrapper, {
+        scale,
+        scrollX: 0,
+        scrollY: 0,
         useCORS: true,
-        allowTaint: true,
-        imageTimeout: 0,
-        backgroundColor: '#ffffff',
-        logging: false
-      }).then(canvas => {
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            console.error('Canvas to Blob failed.');
-            restoreCallback();
-            alert('PNG export failed. Please try a different browser.');
-            return;
-          }
-          const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          const formattedName = inputName.value.trim().toLowerCase().replace(/\s+/g, '_');
-          link.download = `${formattedName}_internship_certificate.png`;
-          link.href = blobUrl;
-          link.click();
-          
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-          restoreCallback();
-        }, 'image/png', 1.0);
-      }).catch(err => {
-        console.error('PNG export failed:', err);
-        restoreCallback();
-        alert('PNG export failed. Please check browser console.');
-      });
-    });
-  });
-
-  // --- PDF Download (HQ A4 Portrait) ---
-  btnDownloadPdf.addEventListener('click', () => {
-    if (!validateFields()) return;
-    prepareCapture((cloneNode, restoreCallback) => {
-      html2canvas(cloneNode, {
-        scale: 2,
+        letterRendering: true,
+        allowTaint: false,
+        imageTimeout: 15000,
         backgroundColor: "#ffffff",
-        useCORS: true,
-        allowTaint: true,
         logging: false,
-        imageTimeout: 0
-      }).then(canvas => {
-        // Setup jsPDF context
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-        
-        // Exactly fill 210mm x 297mm
-        pdf.addImage(canvas, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
-        
-        const formattedName = inputName.value.trim().toLowerCase().replace(/\s+/g, '_');
-        pdf.save(`${formattedName}_internship_certificate.pdf`);
-        
-        restoreCallback();
-      }).catch(err => {
-        console.error('PDF export failed:', err);
-        restoreCallback();
-        alert('PDF export failed. Please check browser console.');
+        removeContainer: true
       });
-    });
-  });
-
-  // --- Print Command ---
-  window.addEventListener('beforeprint', () => {
-    // Hide export buttons
-    const exportFooter = document.querySelector('.cert-export-footer');
-    if (exportFooter) exportFooter.style.display = 'none';
-  });
-
-  window.addEventListener('afterprint', () => {
-    restoreCertificatePreview();
-  });
-
-  window.onafterprint = () => {
-    restoreCertificatePreview();
+    } finally {
+      restore();
+    }
   };
 
-  btnPrint.addEventListener('click', () => {
-    if (!validateFields()) return;
-    // Clone before printing
-    let printContainer = document.getElementById('printCertificate');
-    if (!printContainer) {
-      printContainer = document.createElement('div');
-      printContainer.id = 'printCertificate';
-      document.body.appendChild(printContainer);
-    }
-    printContainer.innerHTML = '';
-    const originalNode = document.getElementById('export-wrapper');
-    const cloneNode = originalNode.cloneNode(true);
-    printContainer.appendChild(cloneNode);
-
-    // Apply strict A4 dimensions for the print container
-    printContainer.style.width = '210mm';
-    printContainer.style.height = '297mm';
-    printContainer.style.position = 'absolute';
-    printContainer.style.top = '0';
-    printContainer.style.left = '0';
-
-    window.print();
-    
-    // Cleanup container immediately after print dialog closes
-    if (printContainer && printContainer.parentNode) {
-      printContainer.parentNode.removeChild(printContainer);
-    }
-  });
-
-  /* ==========================================================================
-     AUTO DAYS CONVERTER
-     ========================================================================== */
-  const calculateDuration = () => {
-    const startVal = inputStartDate.value;
-    const endVal = inputEndDate.value;
-    if (startVal && endVal) {
-      const start = new Date(startVal);
-      const end = new Date(endVal);
-      const diffTime = end - start;
-      if (diffTime >= 0) {
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        const durationStr = `${diffDays} DAYS`;
-        inputDuration.value = durationStr;
-        viewDuration.textContent = durationStr;
+  const saveCanvasAsPng = (canvas) => new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Canvas toBlob returned null."));
+        return;
       }
-    }
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = `${safeFilePart(inputName.value)}_internship_certificate.png`;
+      link.href = blobUrl;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      resolve();
+    }, "image/png", 1.0);
+  });
+
+  const saveCanvasAsPdf = (canvas) => {
+    if (!window.jspdf?.jsPDF) throw new Error("jsPDF library is not loaded.");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 210, 297, undefined, "FAST");
+    pdf.save(`${safeFilePart(inputName.value)}_internship_certificate.pdf`);
   };
-  inputStartDate.addEventListener('change', calculateDuration);
-  inputEndDate.addEventListener('change', calculateDuration);
 
-  /* ==========================================================================
-     FIREBASE DATABASE & VIEWS
-     ========================================================================== */
-  let editingDbId = null;
-  let currentDbView = 'grid'; // 'grid' or 'table'
-  const btnAddDbText = document.getElementById('btnAddDbText');
-  const btnCancelEdit = document.getElementById('btnCancelEdit');
+  const printCanvas = (canvas) => {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iframe);
 
-  const saveToDatabase = async () => {
-    if (!inputName.value.trim() || !inputCertId.value.trim()) return;
+    const docRef = iframe.contentDocument || iframe.contentWindow.document;
+    docRef.open();
+    docRef.write(`<!doctype html>
+      <html>
+        <head>
+          <title>Print Certificate</title>
+          <style>
+            @page { size: A4 portrait; margin: 0; }
+            html, body { margin: 0; width: 210mm; height: 297mm; overflow: hidden; background: #fff; }
+            img { display: block; width: 210mm; height: 297mm; object-fit: fill; }
+          </style>
+        </head>
+        <body><img alt="Certificate" src="${canvas.toDataURL("image/png")}"></body>
+      </html>`);
+    docRef.close();
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => iframe.remove(), 1000);
+    }, 250);
+  };
+
+  const verifyNoDuplicate = async (record, targetDocId) => {
+    const direct = await getDoc(doc(db, DB_COLLECTION, getCertificateDocId(record.cert_id)));
+    if (direct.exists() && direct.id !== targetDocId) return false;
+
+    const duplicateQuery = query(
+      collection(db, DB_COLLECTION),
+      where("cert_id", "==", record.cert_id),
+      limit(2)
+    );
+    const snapshot = await getDocs(duplicateQuery);
+    let duplicate = false;
+    snapshot.forEach((documentSnapshot) => {
+      if (documentSnapshot.id !== targetDocId) duplicate = true;
+    });
+    return !duplicate;
+  };
+
+  const saveToDatabase = async ({ requireValid = true, showSuccess = false } = {}) => {
+    if (requireValid && !validateFields()) return { ok: false, wasEditing: editingDbId !== null };
+
+    const wasEditing = editingDbId !== null;
+    const recordData = buildCurrentRecord();
+    const targetDocId = editingDbId || getCertificateDocId(recordData.cert_id);
 
     try {
-      const recordData = {
-        student_name: inputName.value.trim(),
-        internship_details: inputCourse.value.trim() || selectCourse.value,
-        start_date: inputStartDate.value,
-        end_date: inputEndDate.value,
-        total_days: inputDuration.value.trim(),
-        cert_id: inputCertId.value.trim(),
-        appreciation_text: inputDescription.value.trim(),
-        verification_url: inputVerifyUrl.value.trim(),
-        timestamp: new Date().toISOString()
-      };
+      const isUnique = await verifyNoDuplicate(recordData, targetDocId);
+      if (!isUnique) {
+        alert("A certificate with this ID already exists. Use a unique Certificate ID.");
+        return { ok: false, wasEditing };
+      }
 
-      if (editingDbId !== null) {
-        // UPDATE existing
-        const docRef = doc(db, DB_COLLECTION, editingDbId);
-        await setDoc(docRef, recordData, { merge: true });
+      recordData.db_id = targetDocId;
+      recordData.verification_url = buildVerificationUrl(inputVerifyUrl.value, recordData.cert_id, recordData.verification_token);
+      if (!wasEditing) recordData.createdAt = new Date().toISOString();
+      inputVerifyUrl.value = recordData.verification_url;
+      inputVerifyUrl.dispatchEvent(new Event("input"));
+
+      await setDoc(doc(db, DB_COLLECTION, targetDocId), recordData, { merge: wasEditing });
+
+      if (wasEditing) {
         editingDbId = null;
         if (btnAddDbText) btnAddDbText.textContent = "Add to Database";
         if (btnCancelEdit) btnCancelEdit.style.display = "none";
-      } else {
-        // CREATE new
-        recordData.db_id = Date.now().toString(); // unique ID
-        const docRef = doc(db, DB_COLLECTION, recordData.db_id);
-        await setDoc(docRef, recordData);
       }
-      
-      if (typeof renderDatabase === 'function') renderDatabase();
-    } catch (e) {
-      console.error("Error saving to database: ", e);
-      alert("Failed to save to cloud database. Check console.");
+
+      if (showSuccess) alert("Certificate saved successfully.");
+      await renderDatabase();
+      return { ok: true, wasEditing };
+    } catch (error) {
+      console.error("Error saving certificate:", error);
+      alert("Failed to save certificate. Check your network connection and Firebase permissions.");
+      return { ok: false, wasEditing };
     }
   };
 
-  if (btnCancelEdit) {
-    btnCancelEdit.addEventListener('click', () => {
-      editingDbId = null;
-      if (btnAddDbText) btnAddDbText.textContent = "Add to Database";
-      btnCancelEdit.style.display = "none";
-      advanceCertId(); // reset to next new ID
-    });
-  }
+  const runExport = async (type) => {
+    if (!validateFields()) return;
 
-  btnDownloadPdf.addEventListener('click', () => {
-    saveToDatabase();
-    if (editingDbId === null) advanceCertId();
-  });
-  
-  btnDownloadPng.addEventListener('click', () => {
-    saveToDatabase();
-    if (editingDbId === null) advanceCertId();
-  });
-  
-  const btnAddDb = document.getElementById('btnAddDb');
-  if (btnAddDb) {
-    btnAddDb.addEventListener('click', () => {
-      saveToDatabase();
-      if (editingDbId === null) advanceCertId();
-      showCertView(); // Optional: Flip back to preview after adding
-    });
-  }
+    const button = type === "pdf" ? btnDownloadPdf : type === "png" ? btnDownloadPng : btnPrint;
+    const originalTitle = button?.getAttribute("title") || "";
+    if (button) {
+      button.disabled = true;
+      button.setAttribute("title", "Rendering certificate...");
+    }
 
-  const btnViewDb = document.getElementById('btnViewDb');
-  const btnBackToCert = document.getElementById('btnBackToCert');
-  const certPreviewView = document.getElementById('certPreviewView');
-  const dbListView = document.getElementById('dbListView');
+    try {
+      const saveResult = await saveToDatabase({ requireValid: false });
+      if (!saveResult.ok) return;
+
+      const canvas = await renderCertificateCanvas({ scale: 3.1234257 });
+      if (type === "png") await saveCanvasAsPng(canvas);
+      if (type === "pdf") saveCanvasAsPdf(canvas);
+      if (type === "print") printCanvas(canvas);
+    } catch (error) {
+      console.error(`${type.toUpperCase()} export failed:`, error);
+      alert(`${type.toUpperCase()} export failed. Check the console for details.`);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.setAttribute("title", originalTitle);
+      }
+    }
+  };
+
+  const getRecordById = async (id) => {
+    const snapshot = await getDoc(doc(db, DB_COLLECTION, id.toString()));
+    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+  };
+
+  const populateEditorFromRecord = (record) => {
+    inputName.value = toTitleCase(record.student_name || "");
+    inputName.dispatchEvent(new Event("input"));
+    setInputValue(inputStartDate, toDateInputValue(record.start_date));
+    setInputValue(inputEndDate, toDateInputValue(record.end_date));
+    setInputValue(inputDuration, record.total_days || "");
+    setInputValue(inputIssueDate, toDateInputValue(record.issue_date || record.timestamp || record.createdAt));
+
+    const certId = normalizeCertificateId(record.cert_id || "");
+    inputCertId.value = certId;
+    inputCertId.dispatchEvent(new Event("input"));
+    const parts = certId.split("/");
+    if (parts.length >= 4) {
+      inputCertYear.value = parts[2];
+      inputCertNum.value = parts[3];
+    }
+
+    const course = record.internship_details || "";
+    const courseOptionExists = Array.from(selectCourse.options).some((option) => option.value === course);
+    selectCourse.value = courseOptionExists ? course : "other";
+    inputCourse.value = courseOptionExists ? "" : course.toUpperCase();
+    handleCourseChange();
+
+    const domain = record.domain || "";
+    const domainOptionExists = Array.from(selectDomain.options).some((option) => option.value === domain);
+    selectDomain.value = domainOptionExists ? domain : "other";
+    inputDomain.value = domainOptionExists ? "" : domain;
+    handleDomainChange();
+
+    inputVerifyUrl.value = record.verification_url || buildVerificationUrl("aroxtech.in/verify.html", certId);
+    inputVerifyUrl.dispatchEvent(new Event("input"));
+
+    inputDescription.value = record.appreciation_text || DEFAULT_DESCRIPTION;
+    syncDescription();
+  };
+
+  const advanceCertId = async ({ rotateToken = true } = {}) => {
+    const year = normalizeText(inputCertYear.value) || String(new Date().getFullYear());
+    let nextNum = 101;
+
+    try {
+      const snapshot = await getDocs(query(collection(db, DB_COLLECTION)));
+      snapshot.forEach((documentSnapshot) => {
+        const data = documentSnapshot.data();
+        const certId = normalizeCertificateId(data.cert_id || "");
+        const match = certId.match(CERT_ID_PATTERN);
+        if (!match || match[1] !== year) return;
+        const sequence = parseInt(match[2], 10);
+        if (!Number.isNaN(sequence) && sequence >= nextNum) nextNum = sequence + 1;
+      });
+    } catch (error) {
+      console.warn("Could not read existing certificate IDs. Falling back to 0101.", error);
+    }
+
+    inputCertYear.value = year;
+    inputCertNum.value = String(nextNum).padStart(4, "0");
+    updateCertId();
+  };
 
   const showDbView = () => {
-    if(certPreviewView) certPreviewView.style.display = 'none';
-    if(dbListView) dbListView.style.display = 'block';
+    if (certPreviewView) certPreviewView.style.display = "none";
+    if (dbListView) dbListView.style.display = "block";
   };
 
   const showCertView = () => {
-    if(dbListView) dbListView.style.display = 'none';
-    if(certPreviewView) certPreviewView.style.display = 'flex';
-    if (typeof adjustPreviewScale === 'function') setTimeout(adjustPreviewScale, 50);
+    if (dbListView) dbListView.style.display = "none";
+    if (certPreviewView) certPreviewView.style.display = "flex";
+    setTimeout(adjustPreviewScale, 50);
   };
-
-  if(btnViewDb) {
-    btnViewDb.addEventListener('click', () => {
-      renderDatabase();
-      showDbView();
-    });
-  }
-
-  if(btnBackToCert) {
-    btnBackToCert.addEventListener('click', showCertView);
-  }
-
-  const dbTableBody = document.getElementById('dbTableBody');
-  const btnExportCsv = document.getElementById('btnExportCsv');
-  const btnClearDb = document.getElementById('btnClearDb');
 
   window.editRecord = async (id) => {
     try {
-      const q = query(collection(db, DB_COLLECTION));
-      const querySnapshot = await getDocs(q);
-      let rec = null;
-      querySnapshot.forEach(doc => {
-        if (doc.data().db_id === id.toString() || doc.id === id.toString()) rec = doc.data();
-      });
-      if (!rec) return;
-      
-      inputName.value = rec.student_name;
-      inputStartDate.value = rec.start_date;
-      inputEndDate.value = rec.end_date;
-      inputDuration.value = rec.total_days;
-      inputCertId.value = rec.cert_id;
-      
-      if (inputCertYear && inputCertNum && rec.cert_id) {
-        const parts = rec.cert_id.split('/');
-        if (parts.length >= 4) {
-          inputCertYear.value = parts[2];
-          inputCertNum.value = parts[3];
-        }
-      }
-      
-      const optionExists = Array.from(selectCourse.options).some(opt => opt.value === rec.internship_details);
-      if (optionExists) {
-        selectCourse.value = rec.internship_details;
-        inputCourse.style.display = 'none';
-        inputCourse.value = '';
-      } else {
-        selectCourse.value = 'other';
-        inputCourse.style.display = 'block';
-        inputCourse.value = rec.internship_details;
-      }
-      
-      // Update preview directly
-      viewName.textContent = rec.student_name;
-      viewCourse.textContent = rec.internship_details;
-      const startObj = new Date(rec.start_date);
-      const endObj = new Date(rec.end_date);
-      const formatOpts = { day: '2-digit', month: 'long', year: 'numeric' };
-      if(!isNaN(startObj)) viewStartDate.textContent = startObj.toLocaleDateString('en-GB', formatOpts);
-      if(!isNaN(endObj)) viewEndDate.textContent = endObj.toLocaleDateString('en-GB', formatOpts);
-      viewDuration.textContent = rec.total_days;
-      viewCertId.textContent = rec.cert_id;
-      
-      if (inputVerifyUrl) {
-        inputVerifyUrl.value = rec.verification_url || `aroxtech.in/verify.html?id=${rec.cert_id}`;
-        inputVerifyUrl.dispatchEvent(new Event('input'));
-      }
-      if (inputDescription) {
-        inputDescription.value = rec.appreciation_text || "During this internship, he/she was found to be dedicated,\nenthusiastic and hardworking.\nWe wish him/her all the best for future endeavors.";
-        inputDescription.dispatchEvent(new Event('input'));
-      }
-      
-      editingDbId = id.toString();
-      if (btnAddDbText) btnAddDbText.textContent = "Update Record";
-      if (btnCancelEdit) btnCancelEdit.style.display = "block";
-    } catch(e) { console.error(e); }
-  };
-
-  window.deleteRecord = async (id, event) => {
-    if(event) event.stopPropagation();
-    if (confirm('Are you sure you want to delete this record?')) {
-      try {
-        await deleteDoc(doc(db, DB_COLLECTION, id.toString()));
-        renderDatabase();
-      } catch (e) { console.error("Error deleting document: ", e); }
-    }
-  };
-
-  const renderDatabase = async () => {
-    if (!dbTableBody) return;
-    
-    try {
-      const q = query(collection(db, DB_COLLECTION), orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const records = [];
-      querySnapshot.forEach((doc) => {
-        records.push({ id: doc.id, ...doc.data() });
-      });
-      
-      dbTableBody.innerHTML = '';
-      if (records.length === 0) {
-        dbTableBody.innerHTML = '<div style="padding: 20px; text-align: center; color: #a0aec0; font-size: 13px; grid-column: 1/-1;">No certificates generated yet.</div>';
+      const record = await getRecordById(id);
+      if (!record) {
+        alert("Certificate record not found.");
         return;
       }
 
-      if (currentDbView === 'grid') {
-        dbTableBody.style.display = 'grid';
-        dbTableBody.style.gridTemplateColumns = 'repeat(auto-fill, minmax(300px, 1fr))';
-        dbTableBody.style.gap = '15px';
-        
-        records.forEach(rec => {
-          const item = document.createElement('div');
-          item.className = 'db-item';
-          item.style.cursor = 'pointer';
-          item.onclick = () => window.viewRecordModal(rec.id);
+      populateEditorFromRecord(record);
+      editingDbId = id.toString();
+      if (btnAddDbText) btnAddDbText.textContent = "Update Record";
+      if (btnCancelEdit) btnCancelEdit.style.display = "block";
+      showCertView();
+    } catch (error) {
+      console.error("Error loading certificate for edit:", error);
+      alert("Failed to load certificate record.");
+    }
+  };
+
+  window.deleteRecord = async (id, event) => {
+    if (event) event.stopPropagation();
+    if (!confirm("Are you sure you want to delete this record?")) return;
+
+    try {
+      await deleteDoc(doc(db, DB_COLLECTION, id.toString()));
+      await renderDatabase();
+    } catch (error) {
+      console.error("Error deleting certificate:", error);
+      alert("Failed to delete certificate.");
+    }
+  };
+
+  window.viewRecordModal = async (id) => {
+    if (!recordModal || !modalPreviewContainer) return;
+
+    try {
+      const record = await getRecordById(id);
+      if (!record) {
+        alert("Certificate record not found.");
+        return;
+      }
+
+      document.getElementById("modalCertId").textContent = record.cert_id || "-";
+      document.getElementById("modalName").textContent = record.student_name || "-";
+      document.getElementById("modalCourse").textContent = record.internship_details || "-";
+      document.getElementById("modalDuration").textContent = record.total_days || "-";
+      document.getElementById("modalStart").textContent = formatDate(toDateInputValue(record.start_date)) || "-";
+      document.getElementById("modalEnd").textContent = formatDate(toDateInputValue(record.end_date)) || "-";
+
+      recordModal.style.display = "flex";
+      modalPreviewContainer.innerHTML = '<div style="color:#a0aec0;display:flex;flex-direction:column;align-items:center;gap:10px;">Generating Preview...</div>';
+
+      populateEditorFromRecord(record);
+      editingDbId = id.toString();
+      const canvas = await renderCertificateCanvas({ scale: 0.8 });
+      const imgUrl = canvas.toDataURL("image/png");
+      modalPreviewContainer.innerHTML = `<img src="${imgUrl}" alt="Certificate preview" style="max-width:100%;max-height:100%;object-fit:contain;box-shadow:0 4px 6px rgba(0,0,0,0.1);border-radius:4px;">`;
+
+      const modalBtnPdf = document.getElementById("modalBtnPdf");
+      const modalBtnPng = document.getElementById("modalBtnPng");
+      const modalBtnPrint = document.getElementById("modalBtnPrint");
+      if (modalBtnPdf) modalBtnPdf.onclick = () => runExport("pdf");
+      if (modalBtnPng) modalBtnPng.onclick = () => runExport("png");
+      if (modalBtnPrint) modalBtnPrint.onclick = () => runExport("print");
+    } catch (error) {
+      console.error("Preview Generation Error:", error);
+      modalPreviewContainer.innerHTML = '<div style="color:#e53e3e;">Failed to generate preview.</div>';
+    }
+  };
+
+  const renderEmptyDatabaseState = (message) => {
+    if (!dbTableBody) return;
+    dbTableBody.innerHTML = `<div style="padding:20px;text-align:center;color:#a0aec0;font-size:13px;grid-column:1/-1;">${escapeHtml(message)}</div>`;
+  };
+
+  async function renderDatabase() {
+    if (!dbTableBody) return;
+
+    try {
+      const snapshot = await getDocs(query(collection(db, DB_COLLECTION), orderBy("timestamp", "desc")));
+      const records = [];
+      snapshot.forEach((documentSnapshot) => records.push({ id: documentSnapshot.id, ...documentSnapshot.data() }));
+
+      dbTableBody.innerHTML = "";
+      if (records.length === 0) {
+        renderEmptyDatabaseState("No certificates generated yet.");
+        return;
+      }
+
+      if (currentDbView === "grid") {
+        dbTableBody.style.display = "grid";
+        dbTableBody.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
+        dbTableBody.style.gap = "15px";
+
+        records.forEach((record) => {
+          const item = document.createElement("div");
+          item.className = "db-item";
+          item.style.cursor = "pointer";
           item.innerHTML = `
-            <div class="db-item-header">
-              <span class="db-item-id">${rec.cert_id}</span>
-            </div>
-            <div class="db-item-name">${rec.student_name}</div>
-            <div class="db-item-course" style="font-weight: 500; margin-bottom: 5px;">${rec.internship_details}</div>
-            <div class="db-item-details" style="font-size: 11px; color: #718096; margin-bottom: 10px; line-height: 1.4;">
-              <div><strong>Start:</strong> ${rec.start_date || 'N/A'}</div>
-              <div><strong>End:</strong> ${rec.end_date || 'N/A'}</div>
-              <div><strong>Duration:</strong> ${rec.total_days || 'N/A'}</div>
+            <div class="db-item-header"><span class="db-item-id">${escapeHtml(record.cert_id || "N/A")}</span></div>
+            <div class="db-item-name">${escapeHtml(record.student_name || "N/A")}</div>
+            <div class="db-item-course" style="font-weight:500;margin-bottom:5px;">${escapeHtml(record.internship_details || "N/A")}</div>
+            <div class="db-item-details" style="font-size:11px;color:#718096;margin-bottom:10px;line-height:1.4;">
+              <div><strong>Start:</strong> ${escapeHtml(record.start_date || "N/A")}</div>
+              <div><strong>End:</strong> ${escapeHtml(record.end_date || "N/A")}</div>
+              <div><strong>Duration:</strong> ${escapeHtml(record.total_days || "N/A")}</div>
             </div>
             <div class="db-item-actions">
-              <button class="btn-edit" onclick="event.stopPropagation(); editRecord('${rec.id}')">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
-              </button>
-              <button class="btn-delete" onclick="deleteRecord('${rec.id}', event)">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Del
-              </button>
-            </div>
-          `;
+              <button class="btn-edit" type="button">Edit</button>
+              <button class="btn-delete" type="button">Del</button>
+            </div>`;
+          item.addEventListener("click", () => window.viewRecordModal(record.id));
+          item.querySelector(".btn-edit").addEventListener("click", (event) => {
+            event.stopPropagation();
+            window.editRecord(record.id);
+          });
+          item.querySelector(".btn-delete").addEventListener("click", (event) => window.deleteRecord(record.id, event));
           dbTableBody.appendChild(item);
         });
-      } else {
-        // Table View
-        dbTableBody.style.display = 'block';
-        let html = `
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
-            <thead>
-              <tr style="background: var(--bg-light); border-bottom: 2px solid #e2e8f0; color: var(--primary-navy);">
-                <th style="padding: 12px 15px;">Cert ID</th>
-                <th style="padding: 12px 15px;">Name</th>
-                <th style="padding: 12px 15px;">Course</th>
-                <th style="padding: 12px 15px;">Duration</th>
-                <th style="padding: 12px 15px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-        `;
-        records.forEach(rec => {
-          html += `
-            <tr style="border-bottom: 1px solid #edf2f7; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='#fff'" onclick="window.viewRecordModal('${rec.id}')">
-              <td style="padding: 12px 15px; font-weight: 600; color: var(--primary-gold);">${rec.cert_id}</td>
-              <td style="padding: 12px 15px; font-weight: 600; color: var(--primary-navy);">${rec.student_name}</td>
-              <td style="padding: 12px 15px; color: #4a5568;">${rec.internship_details}</td>
-              <td style="padding: 12px 15px; color: #718096;">${rec.total_days}</td>
-              <td style="padding: 12px 15px;">
-                <button onclick="event.stopPropagation(); editRecord('${rec.id}')" style="background:transparent; border:none; color:var(--primary-navy); cursor:pointer; margin-right:8px;" title="Edit">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
-                <button onclick="deleteRecord('${rec.id}', event)" style="background:transparent; border:none; color:#e53e3e; cursor:pointer;" title="Delete">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                </button>
-              </td>
-            </tr>
-          `;
-        });
-        html += `</tbody></table>`;
-        dbTableBody.innerHTML = html;
+        return;
       }
-    } catch(e) { console.error("Error loading db", e); }
-  };
 
-  if(btnClearDb) {
-    btnClearDb.addEventListener('click', async () => {
-      if (confirm('Are you sure you want to clear all generated certificates? This cannot be undone.')) {
-        try {
-          const q = query(collection(db, DB_COLLECTION));
-          const querySnapshot = await getDocs(q);
-          const deletePromises = [];
-          querySnapshot.forEach((document) => {
-            deletePromises.push(deleteDoc(doc(db, DB_COLLECTION, document.id)));
-          });
-          await Promise.all(deletePromises);
-          renderDatabase();
-        } catch(e) { console.error(e); }
-      }
-    });
-  }
-
-  if(btnExportCsv) {
-    btnExportCsv.addEventListener('click', async () => {
-      try {
-        const q = query(collection(db, DB_COLLECTION));
-        const querySnapshot = await getDocs(q);
-        const records = [];
-        querySnapshot.forEach((doc) => records.push({ id: doc.id, ...doc.data() }));
-
-        if (records.length === 0) {
-          alert('No records to export!');
-          return;
-        }
-        
-        const headers = ['ID', 'Student Name', 'Internship Details', 'Start Date', 'End Date', 'Total Days', 'Cert ID', 'Timestamp'];
-        const csvRows = [headers.join(',')];
-        
-        records.forEach(rec => {
-          const values = [
-            rec.id, 
-            `"${rec.student_name}"`, 
-            `"${rec.internship_details}"`, 
-            rec.start_date, 
-            rec.end_date, 
-            rec.total_days, 
-            rec.cert_id,
-            rec.timestamp
-          ];
-          csvRows.push(values.join(','));
+      dbTableBody.style.display = "block";
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:13px;text-align:left;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.1);border-radius:8px;overflow:hidden;";
+      table.innerHTML = `
+        <thead>
+          <tr style="background:var(--bg-light);border-bottom:2px solid #e2e8f0;color:var(--primary-navy);">
+            <th style="padding:12px 15px;">Cert ID</th>
+            <th style="padding:12px 15px;">Name</th>
+            <th style="padding:12px 15px;">Course</th>
+            <th style="padding:12px 15px;">Duration</th>
+            <th style="padding:12px 15px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>`;
+      const tbody = table.querySelector("tbody");
+      records.forEach((record) => {
+        const row = document.createElement("tr");
+        row.style.cssText = "border-bottom:1px solid #edf2f7;cursor:pointer;transition:background 0.2s;";
+        row.innerHTML = `
+          <td style="padding:12px 15px;font-weight:600;color:var(--primary-gold);">${escapeHtml(record.cert_id || "N/A")}</td>
+          <td style="padding:12px 15px;font-weight:600;color:var(--primary-navy);">${escapeHtml(record.student_name || "N/A")}</td>
+          <td style="padding:12px 15px;color:#4a5568;">${escapeHtml(record.internship_details || "N/A")}</td>
+          <td style="padding:12px 15px;color:#718096;">${escapeHtml(record.total_days || "N/A")}</td>
+          <td style="padding:12px 15px;">
+            <button class="btn-edit" type="button">Edit</button>
+            <button class="btn-delete" type="button">Del</button>
+          </td>`;
+        row.addEventListener("click", () => window.viewRecordModal(record.id));
+        row.querySelector(".btn-edit").addEventListener("click", (event) => {
+          event.stopPropagation();
+          window.editRecord(record.id);
         });
-        
-        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', 'aroxtech_certificates.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch(e) { console.error(e); }
-    });
-  }
-
-  /* ==========================================================================
-     TOGGLE VIEW LOGIC
-     ========================================================================== */
-  const btnGridView = document.getElementById('btnGridView');
-  const btnTableView = document.getElementById('btnTableView');
-  
-  if (btnGridView && btnTableView) {
-    btnGridView.addEventListener('click', () => {
-      currentDbView = 'grid';
-      btnGridView.style.background = '#fff';
-      btnGridView.style.color = 'var(--primary-navy)';
-      btnGridView.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-      btnTableView.style.background = 'transparent';
-      btnTableView.style.color = '#718096';
-      btnTableView.style.boxShadow = 'none';
-      renderDatabase();
-    });
-    btnTableView.addEventListener('click', () => {
-      currentDbView = 'table';
-      btnTableView.style.background = '#fff';
-      btnTableView.style.color = 'var(--primary-navy)';
-      btnTableView.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-      btnGridView.style.background = 'transparent';
-      btnGridView.style.color = '#718096';
-      btnGridView.style.boxShadow = 'none';
-      renderDatabase();
-    });
-  }
-
-  /* ==========================================================================
-     RECORD MODAL LOGIC
-     ========================================================================== */
-  const recordModal = document.getElementById('recordModal');
-  const btnCloseModal = document.getElementById('btnCloseModal');
-  const modalPreviewContainer = document.getElementById('modalPreviewContainer');
-  const exportWrapper = document.getElementById('exportWrapper');
-  
-  window.viewRecordModal = async (id) => {
-    try {
-      // Fetch data
-      const q = query(collection(db, DB_COLLECTION));
-      const querySnapshot = await getDocs(q);
-      let rec = null;
-      querySnapshot.forEach(doc => {
-        if (doc.data().db_id === id.toString() || doc.id === id.toString()) rec = doc.data();
+        row.querySelector(".btn-delete").addEventListener("click", (event) => window.deleteRecord(record.id, event));
+        tbody.appendChild(row);
       });
-      if (!rec) return;
+      dbTableBody.innerHTML = "";
+      dbTableBody.appendChild(table);
+    } catch (error) {
+      console.error("Error loading database:", error);
+      renderEmptyDatabaseState("Could not load certificates. Check Firebase/network status.");
+    }
+  }
 
-      // Populate text fields
-      document.getElementById('modalCertId').textContent = rec.cert_id;
-      document.getElementById('modalName').textContent = rec.student_name;
-      document.getElementById('modalCourse').textContent = rec.internship_details;
-      document.getElementById('modalDuration').textContent = rec.total_days;
-      
-      const startObj = new Date(rec.start_date);
-      const endObj = new Date(rec.end_date);
-      const formatOpts = { day: '2-digit', month: 'long', year: 'numeric' };
-      document.getElementById('modalStart').textContent = !isNaN(startObj) ? startObj.toLocaleDateString('en-GB', formatOpts) : rec.start_date;
-      document.getElementById('modalEnd').textContent = !isNaN(endObj) ? endObj.toLocaleDateString('en-GB', formatOpts) : rec.end_date;
+  const exportCsv = async () => {
+    try {
+      const snapshot = await getDocs(query(collection(db, DB_COLLECTION)));
+      const records = [];
+      snapshot.forEach((documentSnapshot) => records.push({ id: documentSnapshot.id, ...documentSnapshot.data() }));
+      if (records.length === 0) {
+        alert("No records to export.");
+        return;
+      }
 
-      // Open Modal
-      recordModal.style.display = 'flex';
-      modalPreviewContainer.innerHTML = `<div style="color: #a0aec0; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-        <svg class="spinner" viewBox="0 0 50 50" style="width: 30px; height: 30px; animation: spin 1s linear infinite;"><circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="5" stroke-dasharray="31.4 31.4" stroke-linecap="round"></circle></svg>
-        Generating Preview...
-      </div>`;
+      const headers = ["ID", "Student Name", "Internship Details", "Domain", "Start Date", "End Date", "Issue Date", "Total Days", "Cert ID", "Status", "Timestamp"];
+      const csvRows = [headers.join(",")];
+      records.forEach((record) => {
+        const values = [
+          record.id,
+          record.student_name,
+          record.internship_details,
+          record.domain,
+          record.start_date,
+          record.end_date,
+          record.issue_date,
+          record.total_days,
+          record.cert_id,
+          record.status || "VALID",
+          record.timestamp || record.createdAt || ""
+        ].map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`);
+        csvRows.push(values.join(","));
+      });
 
-      // Silently inject this record into the main editor to update the DOM
-      await window.editRecord(id);
-      
-      // Give DOM time to reflow text
-      setTimeout(async () => {
-        try {
-          const canvas = await window.html2canvas(exportWrapper, {
-            scale: 1, // smaller scale for fast preview
-            useCORS: true,
-            logging: false,
-            backgroundColor: null
-          });
-          const imgUrl = canvas.toDataURL('image/png');
-          modalPreviewContainer.innerHTML = `<img src="${imgUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 4px;">`;
-        } catch(e) {
-          console.error("Preview Generation Error:", e);
-          modalPreviewContainer.innerHTML = `<div style="color:#e53e3e;">Failed to generate preview.</div>`;
-        }
-      }, 300);
-
-      // Setup Export Buttons
-      document.getElementById('modalBtnPdf').onclick = () => btnDownloadPdf.click();
-      document.getElementById('modalBtnPng').onclick = () => btnDownloadPng.click();
-      document.getElementById('modalBtnPrint').onclick = () => window.print();
-
-    } catch(e) { console.error(e); }
+      const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "aroxtech_certificates.csv";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("CSV export failed:", error);
+      alert("CSV export failed.");
+    }
   };
 
-  if (btnCloseModal) {
-    btnCloseModal.addEventListener('click', () => {
-      recordModal.style.display = 'none';
-    });
-  }
-  
-  // Close modal when clicking outside
-  window.addEventListener('click', (e) => {
-    if (e.target === recordModal) {
-      recordModal.style.display = 'none';
-    }
+  syncInputName(inputName, viewName, "[Recipient Name]");
+  syncInput(inputCourse, viewCourse, "[Internship/Course Title]");
+  syncDateInput(inputStartDate, viewStartDate, "[Start Date]");
+  syncDateInput(inputEndDate, viewEndDate, "[End Date]");
+  syncInput(inputDuration, viewDuration, "[Duration]", (value) => value.toUpperCase());
+  syncInput(inputDomain, viewDomain, "[Domain]");
+  syncDateInput(inputIssueDate, viewIssueDate, "[Date of Issue]");
+  syncInput(inputCertId, viewCertId, "[Certificate ID]", normalizeCertificateId);
+
+  inputVerifyUrl.addEventListener("input", () => {
+    const url = inputVerifyUrl.value.trim();
+    viewVerifyUrl.textContent = url || "[Verification URL]";
+    updateQRCode(url);
   });
 
-  // Initialize Right Panel view
+  inputCertYear.addEventListener("input", updateCertId);
+  inputCertNum.addEventListener("input", updateCertId);
+  selectCourse.addEventListener("change", handleCourseChange);
+  selectDomain.addEventListener("change", handleDomainChange);
+  inputDescription.addEventListener("input", syncDescription);
+  inputStartDate.addEventListener("change", calculateDuration);
+  inputEndDate.addEventListener("change", calculateDuration);
+  window.addEventListener("resize", adjustPreviewScale);
+
+  if (selectTemplate && certificate) {
+    selectTemplate.addEventListener("change", () => {
+      certificate.classList.remove("template-classic", "template-minimalist", "template-geometric", "template-elegant", "template-circuit");
+      certificate.classList.add(`template-${selectTemplate.value}`);
+    });
+    certificate.classList.add(`template-${selectTemplate.value}`);
+  }
+
+  if (btnGenId) btnGenId.addEventListener("click", () => advanceCertId({ rotateToken: true }));
+  if (btnDownloadPng) btnDownloadPng.addEventListener("click", () => runExport("png"));
+  if (btnDownloadPdf) btnDownloadPdf.addEventListener("click", () => runExport("pdf"));
+  if (btnPrint) btnPrint.addEventListener("click", () => runExport("print"));
+
+  if (btnAddDb) {
+    btnAddDb.addEventListener("click", async () => {
+      const result = await saveToDatabase({ showSuccess: true });
+      if (!result.ok) return;
+      if (!result.wasEditing) await advanceCertId({ rotateToken: true });
+      showCertView();
+    });
+  }
+
+  if (btnCancelEdit) {
+    btnCancelEdit.addEventListener("click", async () => {
+      editingDbId = null;
+      if (btnAddDbText) btnAddDbText.textContent = "Add to Database";
+      btnCancelEdit.style.display = "none";
+      currentVerificationToken = generateVerificationToken();
+      await advanceCertId({ rotateToken: false });
+    });
+  }
+
+  if (btnViewDb) btnViewDb.addEventListener("click", async () => {
+    await renderDatabase();
+    showDbView();
+  });
+  if (btnBackToCert) btnBackToCert.addEventListener("click", showCertView);
+
+  if (btnGridView && btnTableView) {
+    btnGridView.addEventListener("click", () => {
+      currentDbView = "grid";
+      btnGridView.style.background = "#fff";
+      btnGridView.style.color = "var(--primary-navy)";
+      btnGridView.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+      btnTableView.style.background = "transparent";
+      btnTableView.style.color = "#718096";
+      btnTableView.style.boxShadow = "none";
+      renderDatabase();
+    });
+
+    btnTableView.addEventListener("click", () => {
+      currentDbView = "table";
+      btnTableView.style.background = "#fff";
+      btnTableView.style.color = "var(--primary-navy)";
+      btnTableView.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+      btnGridView.style.background = "transparent";
+      btnGridView.style.color = "#718096";
+      btnGridView.style.boxShadow = "none";
+      renderDatabase();
+    });
+  }
+
+  if (btnClearDb) {
+    btnClearDb.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to clear all generated certificates? This cannot be undone.")) return;
+      try {
+        const snapshot = await getDocs(query(collection(db, DB_COLLECTION)));
+        const deletes = [];
+        snapshot.forEach((documentSnapshot) => deletes.push(deleteDoc(doc(db, DB_COLLECTION, documentSnapshot.id))));
+        await Promise.all(deletes);
+        await renderDatabase();
+      } catch (error) {
+        console.error("Clear database failed:", error);
+        alert("Failed to clear database.");
+      }
+    });
+  }
+
+  if (btnExportCsv) btnExportCsv.addEventListener("click", exportCsv);
+
+  if (btnCloseModal) {
+    btnCloseModal.addEventListener("click", () => {
+      recordModal.style.display = "none";
+    });
+  }
+
+  window.addEventListener("click", (event) => {
+    if (event.target === recordModal) recordModal.style.display = "none";
+  });
+
+  handleCourseChange();
+  handleDomainChange();
+  syncDescription();
+  adjustPreviewScale();
+  setTimeout(adjustPreviewScale, 100);
   renderDatabase();
-
-  // Initialize auto ID on page load
-  advanceCertId();
-
+  advanceCertId({ rotateToken: false });
 });
-

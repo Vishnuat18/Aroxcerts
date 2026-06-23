@@ -1,267 +1,263 @@
-import { collection, query, getDocs } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import {
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+  doc,
+  updateDoc,
+  increment
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 import { db } from "./firebase-config.js";
 
-const DB_COLLECTION = 'aroxtech_certificates';
+const DB_COLLECTION = "aroxtech_certificates";
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Elements
-  const certIdInput = document.getElementById('certIdInput');
-  const btnVerifyNow = document.getElementById('btnVerifyNow');
-  const btnScanQr = document.getElementById('btnScanQr');
-  const btnTryAgain = document.getElementById('btnTryAgain');
-  const btnVerifyAnother = document.getElementById('btnVerifyAnother');
-  
-  // Detail Fields (For Card 4)
-  const vdCertId = document.getElementById('vdCertId');
-  const vdName = document.getElementById('vdName');
-  const vdProgram = document.getElementById('vdProgram');
-  const vdDomain = document.getElementById('vdDomain');
-  const vdDuration = document.getElementById('vdDuration');
-  const vdIssueDate = document.getElementById('vdIssueDate');
-  const tlIssueDate = document.getElementById('tlIssueDate');
+const normalizeText = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+const normalizeCertificateId = (value) => normalizeText(value).toUpperCase();
 
-  // Certificate DOM Nodes (For Card 5 Preview)
-  const viewName = document.getElementById('viewName');
-  const viewCourse = document.getElementById('viewCourse');
-  const viewDomain = document.getElementById('viewDomain');
-  const viewStartDate = document.getElementById('viewStartDate');
-  const viewEndDate = document.getElementById('viewEndDate');
-  const viewDuration = document.getElementById('viewDuration');
-  const viewIssueDate = document.getElementById('viewIssueDate');
-  const viewCertId = document.getElementById('viewCertId');
-  const viewVerifyUrl = document.getElementById('viewVerifyUrl');
+const formatDate = (dateStr) => {
+  if (!dateStr) return "--";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split("-");
+    const months = [
+      "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+      "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+    ];
+    return `${day} ${months[Number(month) - 1] || month} ${year}`;
+  }
+  const date = new Date(dateStr);
+  return Number.isNaN(date.getTime())
+    ? dateStr
+    : date.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase();
+};
 
-  // Next Buttons
-  const btnViewDetails = document.getElementById('btnViewDetails');
-  const btnViewCert = document.getElementById('btnViewCert');
-  const btnDownloadPdf = document.getElementById('btnDownloadPdf');
+const asHttpsUrl = (value) => {
+  const url = normalizeText(value);
+  if (!url) return "";
+  return url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`;
+};
 
-  // Utility to format dates securely
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '--';
-    const d = new Date(dateStr);
-    return isNaN(d) ? dateStr : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-  };
+document.addEventListener("DOMContentLoaded", () => {
+  const certIdInput = document.getElementById("certIdInput");
+  const btnVerifyNow = document.getElementById("btnVerifyNow");
+  const btnScanQr = document.getElementById("btnScanQr");
+  const btnTryAgain = document.getElementById("btnTryAgain");
+  const btnVerifyAnother = document.getElementById("btnVerifyAnother");
+  const btnViewDetails = document.getElementById("btnViewDetails");
+  const btnViewCert = document.getElementById("btnViewCert");
 
-  // State Machine Arrays
-  const allSteps = [1, 2, 3, 4, 5, 6, 7, 8].map(i => document.getElementById(`step${i}`));
+  const vdCertId = document.getElementById("vdCertId");
+  const vdName = document.getElementById("vdName");
+  const vdProgram = document.getElementById("vdProgram");
+  const vdDomain = document.getElementById("vdDomain");
+  const vdDuration = document.getElementById("vdDuration");
+  const vdIssueDate = document.getElementById("vdIssueDate");
+  const tlIssueDate = document.getElementById("tlIssueDate");
 
-  const resetWorkflow = () => {
-    allSteps.forEach(el => {
-      if (el) {
-        el.classList.add('inactive');
-        el.classList.remove('active');
-      }
-    });
-    if (allSteps[0]) {
-      allSteps[0].classList.remove('inactive');
-      allSteps[0].classList.add('active');
-    }
-    certIdInput.value = '';
-  };
+  const viewName = document.getElementById("viewName");
+  const viewCourse = document.getElementById("viewCourse");
+  const viewDomain = document.getElementById("viewDomain");
+  const viewStartDate = document.getElementById("viewStartDate");
+  const viewEndDate = document.getElementById("viewEndDate");
+  const viewDuration = document.getElementById("viewDuration");
+  const viewIssueDate = document.getElementById("viewIssueDate");
+  const viewCertId = document.getElementById("viewCertId");
+  const viewVerifyUrl = document.getElementById("viewVerifyUrl");
+  const viewDescription = document.getElementById("viewDescription");
+  const qrcodeContainer = document.getElementById("qrcode");
+
+  const steps = [1, 2, 3, 4, 5, 8]
+    .map((step) => document.getElementById(`step${step}`))
+    .filter(Boolean);
+
+  const invalidText = document.querySelector("#step8 .status-subtext");
 
   const activateStep = (stepNum) => {
-    // Hide all steps
-    allSteps.forEach(el => {
-      if (el) {
-        el.classList.add('inactive');
-        el.classList.remove('active');
-      }
+    steps.forEach((step) => {
+      step.classList.add("inactive");
+      step.classList.remove("active");
     });
-    // Show target step
-    const el = document.getElementById(`step${stepNum}`);
-    if (el) {
-      el.classList.remove('inactive');
-      el.classList.add('active');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    const target = document.getElementById(`step${stepNum}`);
+    if (target) {
+      target.classList.remove("inactive");
+      target.classList.add("active");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
-  // Setup Next button listeners
-  if (btnViewDetails) btnViewDetails.addEventListener('click', () => activateStep(4));
-  if (btnViewCert) btnViewCert.addEventListener('click', () => activateStep(5));
+  const resetWorkflow = () => {
+    if (certIdInput) certIdInput.value = "";
+    activateStep(1);
+  };
 
-  // PDF Download Logic
-  if (btnDownloadPdf) {
-    btnDownloadPdf.addEventListener('click', () => {
-      const element = document.getElementById('certificate');
-      if (!element) return;
-      
-      const opt = {
-        margin: 0,
-        filename: `${vdName.textContent}_Certificate.pdf`,
-        image: { type: 'jpeg', quality: 1.0 },
-        html2canvas: { scale: 3, useCORS: true, logging: false },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-      };
-      
-      const originalTransform = element.style.transform;
-      element.style.transform = 'none'; // reset scale for clear render
-      
-      html2pdf().set(opt).from(element).save().then(() => {
-        element.style.transform = originalTransform;
-      });
+  const showInvalid = (message) => {
+    if (invalidText) invalidText.textContent = message;
+    activateStep(8);
+  };
+
+  const renderQRCode = (url) => {
+    if (!qrcodeContainer) return;
+    qrcodeContainer.innerHTML = "";
+    const qrUrl = asHttpsUrl(url);
+    if (!qrUrl) return;
+    new QRCode(qrcodeContainer, {
+      text: qrUrl,
+      width: 70,
+      height: 70,
+      colorDark: "#082A66",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
     });
-  }
+  };
 
-  // Setup Back button listeners
-  document.querySelectorAll('.btn-back').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetStep = parseInt(btn.getAttribute('data-back-to'));
-      if (targetStep) activateStep(targetStep);
+  const findCertificate = async (certId) => {
+    const lookup = query(
+      collection(db, DB_COLLECTION),
+      where("cert_id", "==", certId),
+      limit(1)
+    );
+    const snapshot = await getDocs(lookup);
+    let found = null;
+    snapshot.forEach((documentSnapshot) => {
+      found = { id: documentSnapshot.id, ...documentSnapshot.data() };
     });
-  });
+    return found;
+  };
 
-  // ==========================================================================
-  // VERIFICATION LOGIC
-  // ==========================================================================
+  const populateCertificate = (record, certId, tokenFromUrl) => {
+    if (record.status === "REVOKED") {
+      showInvalid("This certificate has been revoked by Arox Tech.");
+      return false;
+    }
+
+    if (record.verification_token && tokenFromUrl && record.verification_token !== tokenFromUrl) {
+      showInvalid("The verification QR token is invalid or has been modified.");
+      return false;
+    }
+
+    const certIdText = record.cert_id || certId;
+    const verifyUrl = record.verification_url || `https://aroxtech.in/verify.html?id=${encodeURIComponent(certIdText)}`;
+    const issueDate = formatDate(record.issue_date || record.timestamp || record.createdAt);
+    const description = record.appreciation_text || "During this internship, he/she was found to be dedicated, enthusiastic and hardworking. We wish him/her all the best for future endeavors.";
+
+    if (vdCertId) vdCertId.textContent = certIdText;
+    if (vdName) vdName.textContent = record.student_name || "--";
+    if (vdProgram) vdProgram.textContent = record.internship_details || "--";
+    if (vdDomain) vdDomain.textContent = record.domain || "--";
+    if (vdDuration) vdDuration.textContent = record.total_days || "--";
+    if (vdIssueDate) vdIssueDate.textContent = issueDate;
+    if (tlIssueDate) tlIssueDate.textContent = issueDate;
+
+    if (viewName) viewName.textContent = record.student_name || "--";
+    if (viewCourse) viewCourse.textContent = record.internship_details || "--";
+    if (viewDomain) viewDomain.textContent = record.domain || "--";
+    if (viewStartDate) viewStartDate.textContent = formatDate(record.start_date);
+    if (viewEndDate) viewEndDate.textContent = formatDate(record.end_date);
+    if (viewDuration) viewDuration.textContent = record.total_days || "--";
+    if (viewIssueDate) viewIssueDate.textContent = issueDate;
+    if (viewCertId) viewCertId.textContent = certIdText;
+    if (viewVerifyUrl) viewVerifyUrl.textContent = verifyUrl;
+    if (viewDescription) viewDescription.textContent = description;
+
+    renderQRCode(verifyUrl);
+    return true;
+  };
+
   const verifyCertificate = async () => {
-    const certId = certIdInput.value.trim();
+    const certId = normalizeCertificateId(certIdInput?.value);
+    const tokenFromUrl = new URLSearchParams(window.location.search).get("token") || "";
+
     if (!certId) {
       alert("Please enter a Certificate ID.");
       return;
     }
 
-    // Move to step 2
+    if (btnVerifyNow) btnVerifyNow.disabled = true;
     activateStep(2);
-    
-    // Simulate 2 seconds of loading for effect
-    await new Promise(r => setTimeout(r, 2000));
 
     try {
-      const q = query(collection(db, DB_COLLECTION));
-      const querySnapshot = await getDocs(q);
-      
-      let foundCert = null;
-      querySnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.cert_id === certId || doc.id === certId) {
-          foundCert = data;
-        }
-      });
-
-      if (foundCert) {
-        // Map Firestore fields to UI
-        const issueDt = formatDate(foundCert.issue_date || foundCert.createdAt);
-        const startDt = formatDate(foundCert.start_date);
-        const endDt = formatDate(foundCert.end_date);
-        const nameText = foundCert.student_name || foundCert.candidateName || '--';
-        const progText = foundCert.internship_details || foundCert.program || '--';
-        const domainText = foundCert.domain || '--';
-        const durText = foundCert.total_days || foundCert.duration || '--';
-        const certIdText = foundCert.cert_id || certId;
-        const verifyUrlText = foundCert.verification_url || `aroxtech.in/verify.html?id=${certIdText}`;
-        const descText = foundCert.appreciation_text || "During this internship, he/she was found to be dedicated,\nenthusiastic and hardworking.\nWe wish him/her all the best for future endeavors.";
-
-        // Populate Card 4 Details
-        if (vdCertId) vdCertId.textContent = certIdText;
-        if (vdName) vdName.textContent = nameText;
-        if (vdProgram) vdProgram.textContent = progText;
-        if (vdDomain) vdDomain.textContent = domainText;
-        if (vdDuration) vdDuration.textContent = durText;
-        if (vdIssueDate) vdIssueDate.textContent = issueDt;
-        if (tlIssueDate) tlIssueDate.textContent = issueDt;
-
-        // Populate Actual Certificate DOM in Card 5
-        if (viewName) viewName.textContent = nameText;
-        if (viewCourse) viewCourse.textContent = progText;
-        if (viewDomain) viewDomain.textContent = domainText;
-        if (viewStartDate) viewStartDate.textContent = startDt;
-        if (viewEndDate) viewEndDate.textContent = endDt;
-        if (viewDuration) viewDuration.textContent = durText;
-        if (viewIssueDate) viewIssueDate.textContent = issueDt;
-        if (viewCertId) viewCertId.textContent = certIdText;
-        if (viewVerifyUrl) viewVerifyUrl.textContent = verifyUrlText;
-        
-        const viewDescription = document.getElementById('viewDescription');
-        if (viewDescription) viewDescription.innerHTML = descText.replace(/\n/g, '<br>');
-
-        // Render unique QR code
-        const qrcodeContainer = document.getElementById('qrcode');
-        if (qrcodeContainer) {
-          qrcodeContainer.innerHTML = '';
-          const qrLink = verifyUrlText.startsWith('http') ? verifyUrlText : `https://${verifyUrlText}`;
-          new QRCode(qrcodeContainer, {
-            text: qrLink,
-            width: 70,
-            height: 70,
-            colorDark: "#082A66",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-          });
-        }
-
-        // Show Success Step (user must click next from here)
-        activateStep(3);
-      } else {
-        // Not Found
-        activateStep(8);
+      const record = await findCertificate(certId);
+      if (!record) {
+        showInvalid("This certificate is not found in our records.");
+        return;
       }
 
+      const isValid = populateCertificate(record, certId, tokenFromUrl);
+      if (!isValid) return;
+
+      updateDoc(doc(db, DB_COLLECTION, record.id), {
+        verifiedCount: increment(1),
+        lastVerifiedAt: new Date().toISOString()
+      }).catch((error) => console.warn("Could not update verification count:", error));
+
+      activateStep(3);
     } catch (error) {
       console.error("Verification Error:", error);
-      alert("Failed to connect to database. Make sure your internet connection is active and Firestore is enabled.");
-      resetWorkflow();
+      showInvalid("Verification failed because the database could not be reached.");
+    } finally {
+      if (btnVerifyNow) btnVerifyNow.disabled = false;
     }
   };
 
-  // Event Listeners
-  btnVerifyNow.addEventListener('click', verifyCertificate);
-  
-  certIdInput.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') verifyCertificate();
-  });
-
-  btnTryAgain.addEventListener('click', resetWorkflow);
-  btnVerifyAnother.addEventListener('click', resetWorkflow);
-
-  // Auto-fill from URL param if exists
-  const urlParams = new URLSearchParams(window.location.search);
-  const idFromUrl = urlParams.get('id');
-  if (idFromUrl) {
-    certIdInput.value = idFromUrl;
-    verifyCertificate();
+  if (btnViewDetails) btnViewDetails.addEventListener("click", () => activateStep(4));
+  if (btnViewCert) btnViewCert.addEventListener("click", () => activateStep(5));
+  if (btnVerifyNow) btnVerifyNow.addEventListener("click", verifyCertificate);
+  if (certIdInput) {
+    certIdInput.addEventListener("keyup", (event) => {
+      if (event.key === "Enter") verifyCertificate();
+    });
+  }
+  if (btnTryAgain) btnTryAgain.addEventListener("click", resetWorkflow);
+  if (btnVerifyAnother) btnVerifyAnother.addEventListener("click", resetWorkflow);
+  if (btnScanQr) {
+    btnScanQr.addEventListener("click", () => {
+      alert("Open the QR code with your device camera. It will bring you back to this verification page automatically.");
+    });
   }
 
-  // Modal Logic
+  document.querySelectorAll(".btn-back").forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetStep = parseInt(button.getAttribute("data-back-to"), 10);
+      if (targetStep) activateStep(targetStep);
+    });
+  });
+
   window.openCertModal = () => {
-    const modal = document.getElementById('certModal');
-    const certWrapper = document.getElementById('certTransformWrapper');
-    const modalContainer = modal.querySelector('div');
-    
-    // Move the cert into the modal container
-    if (modalContainer && certWrapper) {
-      modalContainer.appendChild(certWrapper);
-      
-      // Scale it to 0.256 for bigger view
-      certWrapper.style.transform = 'scale(0.256)';
-      
-      modal.style.display = 'flex';
-      
-      // Animate opacity
-      modal.style.opacity = '0';
-      setTimeout(() => {
-        modal.style.transition = 'opacity 0.3s ease';
-        modal.style.opacity = '1';
-      }, 10);
-    }
+    const modal = document.getElementById("certModal");
+    const certWrapper = document.getElementById("certTransformWrapper");
+    const modalContainer = modal?.querySelector("div");
+    if (!modal || !modalContainer || !certWrapper) return;
+
+    modalContainer.appendChild(certWrapper);
+    certWrapper.style.transform = "scale(0.8)";
+    modal.style.display = "flex";
+    modal.style.opacity = "0";
+    setTimeout(() => {
+      modal.style.transition = "opacity 0.3s ease";
+      modal.style.opacity = "1";
+    }, 10);
   };
 
   window.closeCertModal = () => {
-    const modal = document.getElementById('certModal');
-    const certWrapper = document.getElementById('certTransformWrapper');
-    const originalContainer = document.querySelector('#certPreviewBox > div');
-    
-    if (originalContainer && certWrapper) {
-      modal.style.opacity = '0';
-      
-      setTimeout(() => {
-        // Move it back
-        originalContainer.appendChild(certWrapper);
-        // Scale back to 0.129
-        certWrapper.style.transform = 'scale(0.129)';
-        modal.style.display = 'none';
-      }, 300); // match transition duration
-    }
+    const modal = document.getElementById("certModal");
+    const certWrapper = document.getElementById("certTransformWrapper");
+    const originalContainer = document.querySelector("#certPreviewBox > div");
+    if (!modal || !originalContainer || !certWrapper) return;
+
+    modal.style.opacity = "0";
+    setTimeout(() => {
+      originalContainer.appendChild(certWrapper);
+      certWrapper.style.transform = "scale(0.403)";
+      modal.style.display = "none";
+    }, 300);
   };
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const idFromUrl = urlParams.get("id");
+  if (idFromUrl && certIdInput) {
+    certIdInput.value = normalizeCertificateId(idFromUrl);
+    verifyCertificate();
+  } else {
+    activateStep(1);
+  }
 });
