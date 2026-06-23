@@ -1530,7 +1530,6 @@ body {
   }
 
   .cert-scale-wrapper {
-    transform: none !important;
     width: 100% !important;
     height: 100% !important;
     position: absolute !important;
@@ -1541,7 +1540,6 @@ body {
   #export-wrapper {
     width: 100% !important;
     height: 100% !important;
-    transform: none !important;
     position: relative !important;
     background:
       radial-gradient(circle at center,
