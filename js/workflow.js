@@ -106,8 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Setup Back button listeners
   document.querySelectorAll('.btn-back').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const targetStep = parseInt(e.target.getAttribute('data-back-to'));
+    btn.addEventListener('click', () => {
+      const targetStep = parseInt(btn.getAttribute('data-back-to'));
       if (targetStep) activateStep(targetStep);
     });
   });
