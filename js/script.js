@@ -4,72 +4,15 @@
    form validation alerts, scale previewing, and PDF/PNG exports.
    ========================================================================== */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { db } from "./firebase-config.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBBvJuEq70b1JGqC83YFJy_4780B24S0bM",
-  authDomain: "arox-48513.firebaseapp.com",
-  projectId: "arox-48513",
-  storageBucket: "arox-48513.firebasestorage.app",
-  messagingSenderId: "317254519087",
-  appId: "1:317254519087:web:8d0478c26094cc470739da"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const DB_COLLECTION = 'aroxtech_certificates';
+
+import { auth } from "./firebase-config.js";
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  /* ==========================================================================
-     AUTHENTICATION LOGIC
-     ========================================================================== */
-  const loginModal = document.getElementById('loginModal');
-  const loginPassword = document.getElementById('loginPassword');
-  const btnLoginSubmit = document.getElementById('btnLoginSubmit');
-  const loginError = document.getElementById('loginError');
-
-  const appContainer = document.getElementById('appContainer');
-
-  const checkAuth = () => {
-    if (sessionStorage.getItem('arox_admin_auth') === 'true') {
-      if(loginModal) loginModal.classList.remove('active');
-
-      if(appContainer) appContainer.style.display = 'flex';
-    } else {
-      if(loginModal) loginModal.classList.add('active');
-
-      if(appContainer) appContainer.style.display = 'none';
-    }
-  };
-
-  const attemptLogin = () => {
-    if (loginPassword.value === 'arox2026') {
-      sessionStorage.setItem('arox_admin_auth', 'true');
-      if(loginModal) loginModal.classList.remove('active');
-
-      if(appContainer) appContainer.style.display = 'flex';
-      if(loginError) loginError.textContent = '';
-      
-      // Calculate layout now that it's visible
-      if (typeof adjustPreviewScale === 'function') setTimeout(adjustPreviewScale, 50);
-    } else {
-      if(loginError) loginError.textContent = 'Incorrect password.';
-      if(loginPassword) loginPassword.value = '';
-    }
-  };
-
-  if (btnLoginSubmit) {
-    btnLoginSubmit.addEventListener('click', attemptLogin);
-  }
-  if (loginPassword) {
-    loginPassword.addEventListener('keyup', (e) => {
-      if (e.key === 'Enter') attemptLogin();
-    });
-  }
-
-  checkAuth();
 
   // --- HTML Elements Cache ---
   const scaleWrapper = document.getElementById('certScaleWrapper');
@@ -179,8 +122,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Handle Certificate ID Multi-part Logic
   const updateCertId = () => {
     if (inputCertYear && inputCertNum && inputCertId) {
-      inputCertId.value = `AT/INT/${inputCertYear.value.trim()}/${inputCertNum.value.trim()}`;
+      const generatedId = `AT/INT/${inputCertYear.value.trim()}/${inputCertNum.value.trim()}`;
+      inputCertId.value = generatedId;
       inputCertId.dispatchEvent(new Event('input'));
+      
+      // Auto-update Verification URL to point to verify.html?id=
+      if (inputVerifyUrl) {
+        inputVerifyUrl.value = `https://aroxtech.com/verify.html?id=${generatedId}`;
+        inputVerifyUrl.dispatchEvent(new Event('input'));
+      }
     }
   };
   if (inputCertYear) inputCertYear.addEventListener('input', updateCertId);
@@ -243,15 +193,55 @@ document.addEventListener('DOMContentLoaded', () => {
   inputDescription.addEventListener('input', syncDescription);
   syncDescription(); // Initial sync on load
 
-  // Sync verification URL to the preview link
+  // Template Switching Logic
+  const selectTemplate = document.getElementById('selectTemplate');
+  const certificateContainer = document.getElementById('certificate');
+  
+  if (selectTemplate && certificateContainer) {
+    selectTemplate.addEventListener('change', (e) => {
+      // Remove any existing template classes
+      certificateContainer.classList.remove('template-classic', 'template-minimalist', 'template-geometric', 'template-elegant', 'template-circuit');
+      // Add the new one
+      certificateContainer.classList.add(`template-${e.target.value}`);
+    });
+    // Initialize default
+    certificateContainer.classList.add(`template-${selectTemplate.value}`);
+  }
+
+  // Sync verification URL to the preview link and update QR Code
+  let qrCodeInstance = null;
+  const qrcodeContainer = document.getElementById('qrcode');
+  
+  const updateQRCode = (url) => {
+    if (!qrcodeContainer) return;
+    qrcodeContainer.innerHTML = ''; // clear old QR
+    /*
+    // QR Code rendering temporarily disabled at user request
+    if (!url || url === '[Verification URL]' || url === 'https://[Verification URL]') return;
+    
+    qrCodeInstance = new QRCode(qrcodeContainer, {
+      text: url,
+      width: 70,
+      height: 70,
+      colorDark: "#082A66",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    */
+  };
+
   inputVerifyUrl.addEventListener('input', (e) => {
     const urlVal = e.target.value.trim();
     const finalUrl = urlVal.startsWith('http') ? urlVal : (urlVal ? `https://${urlVal}` : '');
     viewVerifyUrl.textContent = finalUrl || '[Verification URL]';
+    updateQRCode(finalUrl);
   });
+  
   // Initialize on load
   const initialUrl = inputVerifyUrl.value.trim();
-  viewVerifyUrl.textContent = initialUrl ? (initialUrl.startsWith('http') ? initialUrl : `https://${initialUrl}`) : '[Verification URL]';
+  const startUrl = initialUrl ? (initialUrl.startsWith('http') ? initialUrl : `https://${initialUrl}`) : '[Verification URL]';
+  viewVerifyUrl.textContent = startUrl;
+  if (initialUrl) updateQRCode(startUrl);
 
   /* ==========================================================================
      FORM VALIDATION PIPELINE

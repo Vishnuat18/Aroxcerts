@@ -1,0 +1,123 @@
+/* Verify Portal Styles */
+body {
+  background: #F7FAFC;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  height: auto;
+  overflow: auto;
+  padding: 40px 20px;
+}
+.verify-container {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.verify-box, .cert-details-card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+  text-align: center;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cert-details-card {
+  animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.verify-logo {
+  height: 45px;
+  margin-bottom: 20px;
+}
+.verify-box h2 {
+  color: var(--primary-navy);
+  margin-bottom: 8px;
+  font-size: 22px;
+}
+.verify-subtitle {
+  color: #718096;
+  font-size: 14px;
+  margin-bottom: 25px;
+}
+.verify-input-group {
+  display: flex;
+  gap: 10px;
+}
+.verify-input-group input {
+  flex: 1;
+  padding: 12px 15px;
+  border: 1px solid #CBD5E0;
+  border-radius: 6px;
+  font-size: 16px;
+  outline: none;
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--primary-navy);
+  text-transform: uppercase;
+}
+.verify-input-group input:focus {
+  border-color: var(--primary-gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+}
+.verify-error {
+  color: #E53E3E;
+  font-size: 13px;
+  margin-top: 15px;
+  min-height: 18px;
+}
+
+/* Details Card */
+.cert-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 30px;
+}
+.cert-status-badge.valid {
+  background: #C6F6D5;
+  color: #22543D;
+}
+.cert-status-badge.valid svg { color: #38A169; width: 20px; }
+.cert-status-badge.revoked {
+  background: #FED7D7;
+  color: #822727;
+}
+.cert-status-badge.revoked svg { color: #E53E3E; width: 20px; }
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 0;
+  border-bottom: 1px solid #EDF2F7;
+  text-align: left;
+}
+.detail-row:last-of-type {
+  border-bottom: none;
+}
+.detail-label {
+  color: #718096;
+  font-size: 14px;
+  font-weight: 600;
+}
+.detail-value {
+  color: var(--primary-navy);
+  font-weight: 700;
+  font-size: 15px;
+  text-align: right;
+  max-width: 60%;
+}
+#vdCertId {
+  font-family: monospace;
+  color: var(--primary-gold);
+}

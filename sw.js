@@ -1,14 +1,13 @@
-const CACHE_NAME = 'arox-cert-v3';
+const CACHE_NAME = 'arox-cert-v4';
 const urlsToCache = [
   './',
   './index.html',
-  './style.css',
-  './script.js',
-  './assets/logo.png',
-  './assets/arox logo.webp',
+  './css/style.css',
+  './js/script.js',
+  './manifest.json',
+  './assets/a logo.png',
   './assets/frame.png',
-  './assets/gold frame.png',
-  './assets/www.aroxtech.in.png'
+  './assets/ChatGPT Image Jun 22, 2026, 12_49_34 AM.png'
 ];
 
 self.addEventListener('install', event => {
@@ -22,6 +21,15 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // Bypass Firebase, Firestore, and Google Fonts
+  if (url.hostname.includes('googleapis.com') || 
+      url.hostname.includes('gstatic.com') || 
+      url.hostname.includes('google.com')) {
+    return; // Let the browser handle it
+  }
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
@@ -34,9 +42,14 @@ self.addEventListener('fetch', event => {
         }
         return response;
       })
-      .catch(() => {
+      .catch(async () => {
         // Fallback to cache if offline
-        return caches.match(event.request);
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        // Prevent "Failed to convert value to Response" by returning a fallback
+        return new Response('Network Error', { status: 408, headers: { 'Content-Type': 'text/plain' } });
       })
   );
 });

@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Certificates Collection Rules
+    match /aroxtech_certificates/{certId} {
+      // 1. PUBLIC VERIFICATION: Anyone can read a certificate (to verify it via QR/Verify page)
+      allow read: if true;
+      
+      // 2. ADMIN ONLY: Only authenticated admins can create, update, or delete certificates
+      // Update: Made public per request "No need of login" for generator
+      allow write: if true;
+    }
+  }
+}

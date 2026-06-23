@@ -1,0 +1,93 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Seed Database</title>
+</head>
+<body>
+    <h1>Seeding Database...</h1>
+    <div id="log" style="font-family: monospace; white-space: pre-wrap;"></div>
+    
+    <script type="module">
+        import { db } from "./js/firebase-config.js";
+        import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+        const logEl = document.getElementById("log");
+        function log(msg) {
+            logEl.textContent += msg + "\n";
+            console.log(msg);
+        }
+
+        const rawData = `| Haseen Fathima M | Digital Marketing Internship | 03 June 2026 | 22 June 2026 | Digital Marketing      | 22 June 2026 | AT/INT/2026/0111   |
+| Lalithasri N     | Digital Marketing Internship | 03 June 2026 | 22 June 2026 | Digital Marketing      | 22 June 2026 | AT/INT/2026/0110   |
+| Afreen S         | Web Development Internship   | 08 June 2026 | 18 June 2026 | Web Development        | 20 June 2026 | AT/INT/2026/0103   |
+| Chinthanmani P   | Web Development Internship   | 08 June 2026 | 18 June 2026 | Web Development        | 20 June 2026 | AT/INT/2026/0109   |
+| Dharanitharan P  | Data Science Internship      | 25 May 2026  | 20 June 2026 | Data Science           | 20 June 2026 | AT/INT/2026/0108   |
+| Padmapriya V     | Web Development Internship   | 08 June 2026 | 18 June 2026 | Web Development        | 20 June 2026 | AT/INT/2026/0102   |
+| Ragavan R        | Digital Marketing Internship | 15 June 2026 | 29 June 2026 | Digital Marketing      | 30 June 2026 | AT/INT/2026/0105   |
+| Raghul M         | App Development Internship   | 15 June 2026 | 29 June 2026 | Mobile App Development | 30 June 2026 | AT/INT/2026/0107   |
+| Sangeeth M       | Digital Marketing Internship | 15 June 2026 | 29 June 2026 | Digital Marketing      | 30 June 2026 | AT/INT/2026/0106   |
+| Sree Adchiya S M | Data Analytics Internship    | 25 May 2026  | 12 June 2026 | Data Analytics         | 20 June 2026 | AT/INT/2026/0101   |
+| Srikanth M       | Digital Marketing Internship | 01 June 2026 | 29 June 2026 | Digital Marketing      | 30 June 2026 | AT/INT/2026/0104   |`;
+
+        const parseDate = (d) => {
+            const parts = d.trim().split(' ');
+            const m = ["January","February","March","April","May","June","July","August","September","October","November","December"].indexOf(parts[1]) + 1;
+            return `${parts[2]}-${m.toString().padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        };
+
+        const calcDuration = (start, end) => {
+            const d1 = new Date(start);
+            const d2 = new Date(end);
+            const diffTime = Math.abs(d2 - d1);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            return diffDays + " Days";
+        };
+
+        const records = rawData.split('\n').filter(l => l.trim()).map(line => {
+            const cols = line.split('|').map(c => c.trim()).filter(c => c);
+            const start = parseDate(cols[2]);
+            const end = parseDate(cols[3]);
+            const issue = parseDate(cols[5]);
+            return {
+                student_name: cols[0],
+                internship_details: cols[1],
+                program: cols[1],
+                start_date: start,
+                end_date: end,
+                domain: cols[4],
+                issue_date: issue,
+                cert_id: cols[6],
+                total_days: calcDuration(start, end),
+                createdAt: new Date().toISOString()
+            };
+        });
+
+        async function seed() {
+            log(`Found ${records.length} records to process.`);
+            
+            for (const rec of records) {
+                try {
+                    // Safe document ID (replace slashes with underscores)
+                    const docId = rec.cert_id.replace(/\//g, '_');
+                    const docRef = doc(db, 'aroxtech_certificates', docId);
+                    
+                    const existing = await getDoc(docRef);
+                    if (existing.exists()) {
+                        log(`Skipping ${rec.cert_id} (already exists)`);
+                        continue;
+                    }
+
+                    await setDoc(docRef, rec);
+                    log(`Inserted ${rec.cert_id} successfully.`);
+                } catch (err) {
+                    log(`Error on ${rec.cert_id}: ${err.message}`);
+                }
+            }
+            log("ALL DONE! You can close this tab.");
+        }
+
+        seed();
+    </script>
+</body>
+</html> -->
