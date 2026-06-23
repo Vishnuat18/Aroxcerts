@@ -377,88 +377,93 @@ document.addEventListener('DOMContentLoaded', () => {
     const originalScrollerWidth = scroller ? scroller.style.width : '';
     const originalScrollerHeight = scroller ? scroller.style.height : '';
     
-    // 1. Reset scale to 1 to render canvas elements at 100% resolution
-    scaleWrapper.style.transform = 'none';
-    if (scroller && exportWrapper) {
-      scroller.style.width = `${exportWrapper.offsetWidth}px`;
-      scroller.style.height = `${exportWrapper.offsetHeight}px`;
+    // 1. We no longer manipulate the live DOM for capture. 
+    // We clone it to a hidden print container.
+    let printContainer = document.getElementById('printCertificate');
+    if (!printContainer) {
+      printContainer = document.createElement('div');
+      printContainer.id = 'printCertificate';
+      printContainer.style.position = 'absolute';
+      printContainer.style.top = '-9999px';
+      printContainer.style.left = '-9999px';
+      printContainer.style.width = '794px'; // A4 Width at 96 DPI
+      printContainer.style.height = '1123px'; // A4 Height at 96 DPI
+      document.body.appendChild(printContainer);
     }
-    // 2. Hide shadow boundary lines during capture
-    if (exportWrapper) {
-      exportWrapper.style.boxShadow = 'none';
-    }
-
-    // Export validation check: verify corner bounds and reposition inward if needed
+    
+    // Clear previous clones
+    printContainer.innerHTML = '';
+    
+    // Clone export-wrapper
+    const originalNode = document.getElementById('export-wrapper');
+    const cloneNode = originalNode.cloneNode(true);
+    
+    // Ensure the clone has no box-shadow to prevent artifacts
+    cloneNode.style.boxShadow = 'none';
+    
+    // Ensure ribbons are within bounds on the clone
     const ribbons = [
-      { el: document.querySelector('.corner-ribbon-tl'), type: 'tl' },
-      { el: document.querySelector('.corner-ribbon-br'), type: 'br' }
+      { el: cloneNode.querySelector('.corner-ribbon-tl'), type: 'tl' },
+      { el: cloneNode.querySelector('.corner-ribbon-br'), type: 'br' }
     ];
     ribbons.forEach(ribbon => {
       if (ribbon.el) {
-        const style = window.getComputedStyle(ribbon.el);
         if (ribbon.type === 'tl') {
-          const topVal = parseFloat(style.top);
-          const leftVal = parseFloat(style.left);
-          if (topVal < 10 || isNaN(topVal)) ribbon.el.style.top = '10px';
-          if (leftVal < 10 || isNaN(leftVal)) ribbon.el.style.left = '10px';
+          ribbon.el.style.top = '10px';
+          ribbon.el.style.left = '10px';
         } else if (ribbon.type === 'br') {
-          const bottomVal = parseFloat(style.bottom);
-          const rightVal = parseFloat(style.right);
-          if (bottomVal < 10 || isNaN(bottomVal)) ribbon.el.style.bottom = '10px';
-          if (rightVal < 10 || isNaN(rightVal)) ribbon.el.style.right = '10px';
+          ribbon.el.style.bottom = '10px';
+          ribbon.el.style.right = '10px';
         }
       }
     });
 
-    // Helper to wait for all image loads
-    const waitForImages = () => {
-      const images = document.querySelectorAll('img');
-      const promises = Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      });
-      return Promise.all(promises);
-    };
+    printContainer.appendChild(cloneNode);
 
-    // Give DOM browser layout engine 150ms and wait for fonts/images to register style adjustments
+    // Hide export buttons from live view temporarily during wait
+    const exportFooter = document.querySelector('.cert-export-footer');
+    if (exportFooter) exportFooter.style.display = 'none';
+
+    // Wait for fonts and images to load in the clone
     setTimeout(async () => {
-      try {
-        if (document.fonts) {
-          await document.fonts.ready;
+      if (exportFooter) exportFooter.style.display = 'flex';
+      
+      callback(cloneNode, () => {
+        // Cleanup function
+        if (printContainer && printContainer.parentNode) {
+          printContainer.parentNode.removeChild(printContainer);
         }
-        await waitForImages();
-      } catch (e) {
-        console.warn('Asset loading warning:', e);
-      }
-
-      // Hide export buttons before capture
-      const exportFooter = document.querySelector('.cert-export-footer');
-      if (exportFooter) exportFooter.style.display = 'none';
-
-      callback(() => {
-        // Restore styling after output completion
-        if (typeof adjustPreviewScale === 'function') adjustPreviewScale();
-        if (exportWrapper) {
-          exportWrapper.style.boxShadow = originalShadow;
-        }
-        if (scroller && exportWrapper) {
-          scroller.style.width = originalScrollerWidth;
-          scroller.style.height = originalScrollerHeight;
-        }
-        if (exportFooter) exportFooter.style.display = 'flex';
+        restoreCertificatePreview();
       });
     }, 150);
-  }
+  };
+
+  window.restoreCertificatePreview = function() {
+    const certPreview = document.querySelector('.preview-panel') || document.querySelector('.certificate-preview');
+    if (certPreview) {
+      certPreview.style.transform = '';
+      certPreview.style.scale = '';
+      certPreview.style.zoom = '';
+      certPreview.style.width = '';
+      certPreview.style.height = '';
+      certPreview.style.position = '';
+      certPreview.style.top = '';
+      certPreview.style.left = '';
+    }
+    const scaleWrapper = document.getElementById('certScaleWrapper');
+    if (scaleWrapper) {
+      scaleWrapper.style.transformOrigin = 'top center';
+    }
+    if (typeof adjustPreviewScale === 'function') adjustPreviewScale();
+    const exportFooter = document.querySelector('.cert-export-footer');
+    if (exportFooter) exportFooter.style.display = 'flex';
+  };
 
   // --- PNG Download (HQ) ---
   btnDownloadPng.addEventListener('click', () => {
     if (!validateFields()) return;
-    prepareCapture((restoreCallback) => {
-      const exportWrapper = document.getElementById('export-wrapper');
-      html2canvas(exportWrapper, {
+    prepareCapture((cloneNode, restoreCallback) => {
+      html2canvas(cloneNode, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
@@ -494,9 +499,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- PDF Download (HQ A4 Portrait) ---
   btnDownloadPdf.addEventListener('click', () => {
     if (!validateFields()) return;
-    prepareCapture((restoreCallback) => {
-      const exportWrapper = document.getElementById('export-wrapper');
-      html2canvas(exportWrapper, {
+    prepareCapture((cloneNode, restoreCallback) => {
+      html2canvas(cloneNode, {
         scale: 2,
         backgroundColor: "#ffffff",
         useCORS: true,
@@ -513,7 +517,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         // Exactly fill 210mm x 297mm
-        // jsPDF supports passing the canvas element directly!
         pdf.addImage(canvas, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
         
         const formattedName = inputName.value.trim().toLowerCase().replace(/\s+/g, '_');
@@ -528,42 +531,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Dynamic Print Scaling ---
+  // --- Print Command ---
   window.addEventListener('beforeprint', () => {
-    // Determine strict printable area that ensures 95-100% coverage
-    // Safe margins subtract a bit from true A4 (794x1123)
-    const printableWidth = 760; 
-    const printableHeight = 1075;
-    
-    const certWidth = certificate.offsetWidth || 794;
-    const certHeight = certificate.offsetHeight || 1123;
-    
-    const scaleX = printableWidth / certWidth;
-    const scaleY = printableHeight / certHeight;
-    const scale = Math.min(scaleX, scaleY);
-    
-    scaleWrapper.style.transform = `scale(${scale})`;
-    scaleWrapper.style.transformOrigin = 'center center';
-
-    // Hide the floating export buttons during print
+    // Hide export buttons
     const exportFooter = document.querySelector('.cert-export-footer');
     if (exportFooter) exportFooter.style.display = 'none';
   });
 
   window.addEventListener('afterprint', () => {
-    // Restore normal preview scaling
-    scaleWrapper.style.transformOrigin = 'top center';
-    adjustPreviewScale();
-
-    // Show the floating export buttons after print
-    const exportFooter = document.querySelector('.cert-export-footer');
-    if (exportFooter) exportFooter.style.display = 'flex';
+    restoreCertificatePreview();
   });
 
-  // --- Print Command ---
+  window.onafterprint = () => {
+    restoreCertificatePreview();
+  };
+
   btnPrint.addEventListener('click', () => {
     if (!validateFields()) return;
+    // Clone before printing
+    let printContainer = document.getElementById('printCertificate');
+    if (!printContainer) {
+      printContainer = document.createElement('div');
+      printContainer.id = 'printCertificate';
+      document.body.appendChild(printContainer);
+    }
+    printContainer.innerHTML = '';
+    const originalNode = document.getElementById('export-wrapper');
+    const cloneNode = originalNode.cloneNode(true);
+    printContainer.appendChild(cloneNode);
+
+    // Apply strict A4 dimensions for the print container
+    printContainer.style.width = '210mm';
+    printContainer.style.height = '297mm';
+    printContainer.style.position = 'absolute';
+    printContainer.style.top = '0';
+    printContainer.style.left = '0';
+
     window.print();
+    
+    // Cleanup container immediately after print dialog closes
+    if (printContainer && printContainer.parentNode) {
+      printContainer.parentNode.removeChild(printContainer);
+    }
   });
 
   /* ==========================================================================
