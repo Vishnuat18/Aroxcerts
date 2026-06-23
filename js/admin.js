@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadDashboardData() {
     try {
-      const q = query(collection(db, DB_COLLECTION), orderBy('timestamp', 'desc'));
+      const q = query(collection(db, DB_COLLECTION));
       const snapshot = await getDocs(q);
       
       allCertificates = [];
@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let monthlyCount = 0;
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
+      
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
         data.id = docSnap.id;
@@ -84,10 +85,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Stats
         verifiedCount += (data.verifiedCount || 0);
         
-        const dateObj = new Date(data.timestamp);
-        if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear) {
-          monthlyCount++;
+        const timestampVal = data.timestamp || data.createdAt;
+        if (timestampVal) {
+          const dateObj = new Date(timestampVal);
+          if (!isNaN(dateObj.getTime())) {
+            if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear) {
+              monthlyCount++;
+            }
+          }
         }
+      });
+
+      // Sort locally descending (newest first)
+      allCertificates.sort((a, b) => {
+        const timeA = new Date(a.timestamp || a.createdAt || 0).getTime();
+        const timeB = new Date(b.timestamp || b.createdAt || 0).getTime();
+        return timeB - timeA;
       });
 
       statTotal.textContent = allCertificates.length;
@@ -114,8 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const tr = document.createElement('tr');
       tr.className = 'db-row';
       
-      const issueDateObj = new Date(cert.timestamp);
-      const formattedDate = !isNaN(issueDateObj) ? issueDateObj.toLocaleDateString('en-GB') : 'Unknown';
+      const issueDateObj = new Date(cert.timestamp || cert.createdAt);
+      const formattedDate = !isNaN(issueDateObj.getTime()) ? issueDateObj.toLocaleDateString('en-GB') : 'Unknown';
 
       tr.innerHTML = `
         <td style="padding: 12px 20px; border-bottom: 1px solid #E2E8F0; font-family: monospace; font-weight: 600; color: var(--primary-navy);">${cert.cert_id || 'N/A'}</td>
