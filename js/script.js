@@ -126,9 +126,11 @@ document.addEventListener('DOMContentLoaded', () => {
       inputCertId.value = generatedId;
       inputCertId.dispatchEvent(new Event('input'));
       
-      // Auto-update Verification URL to point to verify.html?id=
+      // Auto-update Verification URL to append ?id= based on input base
       if (inputVerifyUrl) {
-        inputVerifyUrl.value = `https://aroxtech.in/verify.html?id=${generatedId}`;
+        let baseUrl = inputVerifyUrl.value.split('?id=')[0].trim();
+        if (!baseUrl || baseUrl === 'https://aroxtech.in/verify.html') baseUrl = "aroxtech.in/verify.html";
+        inputVerifyUrl.value = `${baseUrl}?id=${generatedId}`;
         inputVerifyUrl.dispatchEvent(new Event('input'));
       }
     }
@@ -231,9 +233,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   inputVerifyUrl.addEventListener('input', (e) => {
     const urlVal = e.target.value.trim();
-    const finalUrl = urlVal.startsWith('http') ? urlVal : (urlVal ? `https://${urlVal}` : '');
-    viewVerifyUrl.textContent = finalUrl || '[Verification URL]';
-    updateQRCode(finalUrl);
+    // Display exactly what is typed
+    viewVerifyUrl.textContent = urlVal || '[Verification URL]';
+    // Ensure QR code has http/https
+    const qrUrl = urlVal.startsWith('http') ? urlVal : (urlVal ? `https://${urlVal}` : '');
+    updateQRCode(qrUrl);
   });
   
   // Initialize on load
@@ -602,6 +606,8 @@ document.addEventListener('DOMContentLoaded', () => {
         end_date: inputEndDate.value,
         total_days: inputDuration.value.trim(),
         cert_id: inputCertId.value.trim(),
+        appreciation_text: inputDescription.value.trim(),
+        verification_url: inputVerifyUrl.value.trim(),
         timestamp: new Date().toISOString()
       };
 
@@ -732,8 +738,12 @@ document.addEventListener('DOMContentLoaded', () => {
       viewCertId.textContent = rec.cert_id;
       
       if (inputVerifyUrl) {
-        inputVerifyUrl.value = `https://aroxtech.in/verify.html?id=${rec.cert_id}`;
+        inputVerifyUrl.value = rec.verification_url || `aroxtech.in/verify.html?id=${rec.cert_id}`;
         inputVerifyUrl.dispatchEvent(new Event('input'));
+      }
+      if (inputDescription) {
+        inputDescription.value = rec.appreciation_text || "During this internship, he/she was found to be dedicated,\nenthusiastic and hardworking.\nWe wish him/her all the best for future endeavors.";
+        inputDescription.dispatchEvent(new Event('input'));
       }
       
       editingDbId = id.toString();

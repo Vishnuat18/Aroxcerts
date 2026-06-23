@@ -150,6 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const domainText = foundCert.domain || '--';
         const durText = foundCert.total_days || foundCert.duration || '--';
         const certIdText = foundCert.cert_id || certId;
+        const verifyUrlText = foundCert.verification_url || `aroxtech.in/verify.html?id=${certIdText}`;
+        const descText = foundCert.appreciation_text || "During this internship, he/she was found to be dedicated,\nenthusiastic and hardworking.\nWe wish him/her all the best for future endeavors.";
 
         // Populate Card 4 Details
         if (vdCertId) vdCertId.textContent = certIdText;
@@ -169,15 +171,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewDuration) viewDuration.textContent = durText;
         if (viewIssueDate) viewIssueDate.textContent = issueDt;
         if (viewCertId) viewCertId.textContent = certIdText;
-        if (viewVerifyUrl) viewVerifyUrl.textContent = `aroxtech.in/verify.html?id=${certIdText}`;
+        if (viewVerifyUrl) viewVerifyUrl.textContent = verifyUrlText;
+        
+        const viewDescription = document.getElementById('viewDescription');
+        if (viewDescription) viewDescription.innerHTML = descText.replace(/\n/g, '<br>');
 
         // Render unique QR code
         const qrcodeContainer = document.getElementById('qrcode');
         if (qrcodeContainer) {
           qrcodeContainer.innerHTML = '';
-          const verifyUrl = `https://aroxtech.in/verify.html?id=${certIdText}`;
+          const qrLink = verifyUrlText.startsWith('http') ? verifyUrlText : `https://${verifyUrlText}`;
           new QRCode(qrcodeContainer, {
-            text: verifyUrl,
+            text: qrLink,
             width: 70,
             height: 70,
             colorDark: "#082A66",
