@@ -169,13 +169,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewDuration) viewDuration.textContent = durText;
         if (viewIssueDate) viewIssueDate.textContent = issueDt;
         if (viewCertId) viewCertId.textContent = certIdText;
-        if (viewVerifyUrl) viewVerifyUrl.textContent = `aroxtech.com/verify?id=${certIdText}`;
+        if (viewVerifyUrl) viewVerifyUrl.textContent = `aroxtech.in/verify.html?id=${certIdText}`;
 
         // Render unique QR code
         const qrcodeContainer = document.getElementById('qrcode');
         if (qrcodeContainer) {
           qrcodeContainer.innerHTML = '';
-          const verifyUrl = `https://aroxtech.com/verify.html?id=${certIdText}`;
+          const verifyUrl = `https://aroxtech.in/verify.html?id=${certIdText}`;
           new QRCode(qrcodeContainer, {
             text: verifyUrl,
             width: 70,

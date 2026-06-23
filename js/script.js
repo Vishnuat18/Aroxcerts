@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Auto-update Verification URL to point to verify.html?id=
       if (inputVerifyUrl) {
-        inputVerifyUrl.value = `https://aroxtech.com/verify.html?id=${generatedId}`;
+        inputVerifyUrl.value = `https://aroxtech.in/verify.html?id=${generatedId}`;
         inputVerifyUrl.dispatchEvent(new Event('input'));
       }
     }
@@ -732,7 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
       viewCertId.textContent = rec.cert_id;
       
       if (inputVerifyUrl) {
-        inputVerifyUrl.value = `https://aroxtech.com/verify.html?id=${rec.cert_id}`;
+        inputVerifyUrl.value = `https://aroxtech.in/verify.html?id=${rec.cert_id}`;
         inputVerifyUrl.dispatchEvent(new Event('input'));
       }
       
