@@ -688,7 +688,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const showDbView = () => {
     if (certPreviewView) certPreviewView.style.display = "none";
-    if (dbListView) dbListView.style.display = "block";
+    if (dbListView) dbListView.style.display = "flex";
   };
 
   const showCertView = () => {
