@@ -3,12 +3,14 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/10.9.0/firebase
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBBvJuEq70b1JGqC83YFJy_4780B24S0bM",
-  authDomain: "arox-48513.firebaseapp.com",
-  projectId: "arox-48513",
-  storageBucket: "arox-48513.firebasestorage.app",
-  messagingSenderId: "317254519087",
-  appId: "1:317254519087:web:8d0478c26094cc470739da"
+  apiKey: "AIzaSyBAw4Qisqi4E5miDqfHC-5ldEZaU6HVRQs",
+  authDomain: "arox-73685.firebaseapp.com",
+  databaseURL: "https://arox-73685-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "arox-73685",
+  storageBucket: "arox-73685.firebasestorage.app",
+  messagingSenderId: "608488371783",
+  appId: "1:608488371783:web:357b6829033808565be362",
+  measurementId: "G-BG7N78YKK3"
 };
 
 const app = initializeApp(firebaseConfig);
